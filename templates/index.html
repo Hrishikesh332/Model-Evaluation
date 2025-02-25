@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jockey - Video Analysis AI</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="top-bar d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-3">
+            <img src="src\twelvelabs.png" alt="Twelve Labs Logo" class="logo">
+            <div class="search-container d-inline-block">
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-light border d-flex justify-content-between align-items-center w-auto" 
+                            type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="text-truncate" style="max-width: 200px;">Hybe_New</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M2 5l6 6 6-6"/>
+                            </svg>
+                        </div>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li>
+                            <select id="projectSelect" class="form-select border-0">
+                                <option value="" selected disabled>Select a project</option>
+                            </select>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#newProjectModal">Create New Project</a></li>
+                    </ul>
+                </div>
+                <a href="#" 
+                   target="_blank" 
+                   rel="noopener noreferrer" 
+                   class="text-decoration-none d-inline-block ms-2"
+                   id="externalLink"
+                   onclick="event.stopPropagation();">
+                    <svg fill="#000000" width="12" height="12" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+        
+        <div class="api-status" data-bs-toggle="modal" data-bs-target="#apiModal">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2z"/>
+                <path d="M12 6v6l4 2"/>
+            </svg>
+            API Key: Not Connected
+        </div>
+    </div>
+
+    <!-- API Connection Modal -->
+    <div class="modal fade" id="apiModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Connect API Key</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="apiKey" class="form-label">Enter your TwelveLabs API Key</label>
+                        <input type="password" class="form-control" id="apiKey" placeholder="sk_...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveApiKey">Connect</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div class="modal fade" id="newProjectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Project</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="projectName" class="form-label">Project Name</label>
+                        <input type="text" class="form-control" id="projectName" placeholder="Enter project name">
+                    </div>
+                    <div class="mb-3">
+                        <label for="videoUpload" class="form-label">Upload Video</label>
+                        <input type="file" class="form-control" id="videoUpload" accept="video/*">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="createProject">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <!-- Alert Container -->
+        <div id="alertContainer"></div>
+
+        <div class="row">
+            <div class="col-lg-6 border-end full-height-border">
+                <div class="d-flex align-items-center gap-2 justify-content-between">
+                    <h3 class="section-title mb-0">Models</h3>
+                    <div>
+                        <select class="form-select form-select-sm" aria-label="Performance filter">
+                            <option selected>gemini-flash-2.0</option>
+                            <option value="1">gpt-4.o</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <div class="suggestion-card">
+                    <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+                        <line x1="7" y1="2" x2="7" y2="22"/>
+                        <line x1="17" y1="2" x2="17" y2="22"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                    </svg>
+                    Find 10 synchronized choreography clips
+                </div>
+                <div class="suggestion-card">
+                    <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" y1="19" x2="12" y2="23"/>
+                        <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    Find 3 memorable rap verses
+                </div>
+                <div class="suggestion-card">
+                    <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    Show standout performance moments
+                </div>
+            </div>
+            <div class="col-lg-6 border-start full-height-border">
+                <div class="d-flex align-items-center gap-2 justify-content-between">
+                    <h3 class="section-title mb-0">Twelve Labs Models</h3>
+                    <div>
+                        <select class="form-select form-select-sm" aria-label="Technical filter">
+                            <option selected>pegasus-1.2</option>
+                        </select>
+                    </div>
+                </div>
+                <hr>
+                <div class="suggestion-card">
+                    <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+                        <line x1="12" y1="18" x2="12" y2="18"/>
+                    </svg>
+                    Look for 3 clips with an iPhone
+                </div>
+                <div class="suggestion-card">
+                    <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Analyze video settings
+                </div>
+                <div class="suggestion-card">
+                    <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="14.31" y1="8" x2="20.05" y2="17.94"/>
+                        <line x1="9.69" y1="8" x2="21.17" y2="8"/>
+                        <line x1="7.38" y1="12" x2="13.12" y2="2.06"/>
+                        <line x1="9.69" y1="16" x2="3.95" y2="6.06"/>
+                        <line x1="14.31" y1="16" x2="2.83" y2="16"/>
+                        <line x1="16.62" y1="12" x2="10.88" y2="21.94"/>
+                    </svg>
+                    Find lighting transitions
+                </div>
+            </div>
+        </div>
+        
+        <!-- Search Results Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div id="modelEvalResults"></div>
+                <div id="searchResults"></div>
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <div class="input-group d-flex align-items-center">
+                <input type="text" class="form-control message-input" placeholder="Ask me to search and analyze your video content...">
+                <button class="btn btn-primary send-button">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13"/>
+                        <path d="M22 2L15 22L11 13L2 9L22 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
