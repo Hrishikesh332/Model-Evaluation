@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jockey - Video Analysis AI</title>
+    <title>Model Evaluation - Video Analysis AI</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
     <div class="top-bar d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <img src="src\twelvelabs.png" alt="Twelve Labs Logo" class="logo">
+            <img src="{{ url_for('static', filename='src\twelvelabs.png') }}" alt="Twelve Labs Logo" class="logo">
             <div class="search-container d-inline-block">
                 <div class="dropdown d-inline-block">
                     <button class="btn btn-light border d-flex justify-content-between align-items-center w-auto" 
                             type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <span class="text-truncate" style="max-width: 200px;">Hybe_New</span>
+                        <span class="text-truncate" style="max-width: 200px;">Select Index</span>
                         <div class="d-flex align-items-center gap-2">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                                 <path d="M2 5l6 6 6-6"/>
@@ -25,8 +25,17 @@
                     <ul class="dropdown-menu">
                         <li>
                             <select id="projectSelect" class="form-select border-0">
-                                <option value="" selected disabled>Select a project</option>
+                                <option value="" selected disabled>Select an index</option>
                             </select>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <div id="videoSelectContainer" class="p-2">
+                                <label class="form-label fw-bold mb-2">Select Video:</label>
+                                <select id="videoSelect" class="form-select">
+                                    <option value="" selected disabled>Select a video</option>
+                                </select>
+                            </div>
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#newProjectModal">Create New Project</a></li>
@@ -66,6 +75,10 @@
                     <div class="mb-3">
                         <label for="apiKey" class="form-label">Enter your TwelveLabs API Key</label>
                         <input type="password" class="form-control" id="apiKey" placeholder="sk_...">
+                    </div>
+                    <div class="form-text">
+                        <p>API key is optional. You can use public videos without an API key.</p>
+                        <p>For complete access to your own videos, connect your TwelveLabs API key.</p>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -113,7 +126,7 @@
                     <div>
                         <select class="form-select form-select-sm" aria-label="Performance filter">
                             <option selected>gemini-flash-2.0</option>
-                            <option value="1">gpt-4.o</option>
+                            <option value="1">gpt-4o</option>
                         </select>
                     </div>
                 </div>
@@ -192,8 +205,8 @@
         
         <div class="chat-input">
             <div class="input-group d-flex align-items-center">
-                <input type="text" class="form-control message-input" placeholder="Ask me to search and analyze your video content...">
-                <button class="btn btn-primary send-button">
+                <input type="text" class="form-control message-input" placeholder="Select a video first..." disabled>
+                <button class="btn btn-primary send-button" disabled>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 2L11 13"/>
                         <path d="M22 2L15 22L11 13L2 9L22 2z"/>

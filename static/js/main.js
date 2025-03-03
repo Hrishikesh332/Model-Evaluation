@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-
+ 
     const suggestionCards = document.querySelectorAll('.suggestion-card');
     const messageInput = document.querySelector('.message-input');
     const apiStatus = document.querySelector('.api-status');
@@ -14,79 +14,113 @@ document.addEventListener('DOMContentLoaded', function() {
     const alertContainer = document.getElementById('alertContainer');
     const searchResults = document.getElementById('searchResults');
     const dropdownButton = document.querySelector('.btn.btn-light.border span');
+    const leftPanel = document.querySelector('.col-lg-6.border-end');
+    const rightPanel = document.querySelector('.col-lg-6.border-start');
+    const modelSelector = document.querySelector('.form-select[aria-label="Performance filter"]');
+    const techModelSelector = document.querySelector('.form-select[aria-label="Technical filter"]');
 
-    const sampleProjects = [
-        { id: "project1", name: "Hybe_New", url: "https://playground.twelvelabs.io/indexes/67900e1181c61d781369699f" },
-        { id: "project2", name: "Talent Show", url: "https://playground.twelvelabs.io/indexes/12345" },
-        { id: "project3", name: "Music Videos", url: "https://playground.twelvelabs.io/indexes/67890" }
-    ];
-
-    function initializeProjects() {
-        while (projectSelect.options.length > 0) {
-            projectSelect.remove(0);
-        }
+    let videoSelectContainer = document.getElementById('videoSelectContainer');
+    if (!videoSelectContainer) {
+        videoSelectContainer = document.createElement('div');
+        videoSelectContainer.id = 'videoSelectContainer';
+        videoSelectContainer.className = 'dropdown-menu videoSelectMenu p-2';
+        videoSelectContainer.innerHTML = `
+            <div class="mb-2">
+                <label class="form-label fw-bold mb-2">Select Video:</label>
+                <select id="videoSelect" class="form-select"></select>
+            </div>
+        `;
         
-        const defaultOption = document.createElement('option');
-        defaultOption.value = "";
-        defaultOption.textContent = "Select a project";
-        defaultOption.disabled = true;
-        defaultOption.selected = true;
-        projectSelect.appendChild(defaultOption);
-        
-        sampleProjects.forEach(project => {
-            const option = document.createElement('option');
-            option.value = project.id;
-            option.textContent = project.name;
-            option.dataset.url = project.url;
-            projectSelect.appendChild(option);
-        });
-
-        if (sampleProjects.length > 0) {
-            projectSelect.value = sampleProjects[0].id;
-            updateExternalLink(sampleProjects[0].url);
-            
-            if (dropdownButton) {
-                dropdownButton.textContent = sampleProjects[0].name;
-            }
+        // Append to dropdown menu
+        const dropdownMenu = document.querySelector('.dropdown-menu');
+        if (dropdownMenu) {
+            const hr = document.createElement('hr');
+            hr.className = 'dropdown-divider';
+            dropdownMenu.appendChild(hr);
+            dropdownMenu.appendChild(videoSelectContainer);
         }
     }
+    
+    const videoSelect = document.getElementById('videoSelect');
 
-    initializeProjects();
+    // State variables
+    let isApiConnected = false;
+    let selectedIndexId = null;
+    let selectedVideoId = null;
+    let isPublicVideo = false;
+    let currentVideos = [];
 
-    projectSelect.addEventListener('change', function() {
-        const selectedOption = this.options[this.selectedIndex];
-        const projectName = selectedOption.textContent;
-        const projectUrl = selectedOption.dataset.url;
- 
-        if (dropdownButton) {
-            dropdownButton.textContent = projectName;
-        }
- 
-        updateExternalLink(projectUrl);
-    });
-
-    function updateExternalLink(url) {
-        if (externalLink) {
-            externalLink.href = url || "#";
-        }
+    // Check for existing API key on load
+    const savedApiKey = localStorage.getItem('apiKey');
+    if (savedApiKey) {
+        connectWithApiKey(savedApiKey);
+    } else {
+        // Load public indexes by default
+        loadPublicIndexes();
     }
-
-
-    suggestionCards.forEach(card => {
-        card.addEventListener('click', function() {
-            messageInput.value = this.textContent.trim();
-            messageInput.focus();
-        });
-    });
 
     if (saveApiKeyBtn) {
         saveApiKeyBtn.addEventListener('click', function() {
             const apiKey = apiKeyInput.value.trim();
             if (apiKey) {
-                localStorage.setItem('apiKey', apiKey);
-                updateApiStatus(true);
-                bootstrap.Modal.getInstance(document.getElementById('apiModal')).hide();
-                showAlert('API key connected successfully', 'success');
+                connectWithApiKey(apiKey);
+            } else {
+                showAlert('Please enter a valid API key', 'warning');
+            }
+        });
+    }
+
+    suggestionCards.forEach(card => {
+        card.addEventListener('click', function() {
+            if (!selectedVideoId) {
+                showAlert('Please select a video first', 'warning');
+                return;
+            }
+            messageInput.value = this.textContent.trim();
+            messageInput.focus();
+        });
+    });
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    if (videoSelect) {
+        videoSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const videoId = selectedOption.value;
+                const videoName = selectedOption.textContent;
+                
+                selectedVideoId = videoId;
+                selectVideo(selectedIndexId, videoId, videoName, isPublicVideo);
+            }
+        });
+    }
+
+    if (projectSelect) {
+        projectSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption && selectedOption.value) {
+                const indexName = selectedOption.textContent;
+                const indexUrl = selectedOption.dataset.url;
+                const indexId = selectedOption.value;
+                
+                if (dropdownButton) {
+                    dropdownButton.textContent = indexName;
+                }
+                
+                if (externalLink) {
+                    externalLink.href = indexUrl || "#";
+                }
+
+                selectedIndexId = indexId;
+                selectedVideoId = null;
+                
+                loadVideosForIndex(indexId);
             }
         });
     }
@@ -106,80 +140,446 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-
-            showAlert(`Creating project "${projectName}" with video "${videoFile.name}"...`, 'info');
+            showAlert('Note: Project creation requires API access. Please connect your TwelveLabs API key.', 'info');
 
             setTimeout(() => {
-                bootstrap.Modal.getInstance(document.getElementById('newProjectModal')).hide();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newProjectModal'));
+                if (modal) modal.hide();
                 
                 projectNameInput.value = '';
                 videoUploadInput.value = '';
-     
-                const newProject = {
-                    id: `project${Date.now()}`,
-                    name: projectName,
-                    url: "#"
-                };
-                
-                sampleProjects.push(newProject);
-     
-                const option = document.createElement('option');
-                option.value = newProject.id;
-                option.textContent = newProject.name;
-                option.dataset.url = newProject.url;
-                projectSelect.appendChild(option);
-                
-        
-                projectSelect.value = newProject.id;
-        
-                if (dropdownButton) {
-                    dropdownButton.textContent = newProject.name;
-                }
-                
-                showAlert(`Project "${projectName}" created successfully!`, 'success');
-            }, 1500);
+            }, 2000);
         });
     }
 
-
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
+    // Connect with API key
+    function connectWithApiKey(apiKey) {
+        if (saveApiKeyBtn) {
+            saveApiKeyBtn.disabled = true;
+            saveApiKeyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Connecting...';
         }
-    });
+
+        fetch('/api/connect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                type: 'twelvelabs',
+                api_key: apiKey
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (saveApiKeyBtn) {
+                saveApiKeyBtn.disabled = false;
+                saveApiKeyBtn.textContent = 'Connect';
+            }
+
+            if (data.status === 'success') {
+                localStorage.setItem('apiKey', apiKey);
+                updateApiStatus(true);
+                isApiConnected = true;
+                showAlert('API key connected successfully', 'success');
+
+                if (data.indexes && data.indexes.length > 0) {
+                    updateIndexesDropdown(data.indexes, false);
+                } else {
+                    showAlert('No indexes found in your account. Loading public indexes.', 'info');
+                    loadPublicIndexes();
+                }
+                
+                const modal = bootstrap.Modal.getInstance(document.getElementById('apiModal'));
+                if (modal) modal.hide();
+            } else {
+                showAlert(data.message || 'Failed to connect API key', 'danger');
+                loadPublicIndexes(); 
+            }
+        })
+        .catch(error => {
+
+            if (saveApiKeyBtn) {
+                saveApiKeyBtn.disabled = false;
+                saveApiKeyBtn.textContent = 'Connect';
+            }
+
+            console.error('Error connecting API:', error);
+            showAlert('Error connecting to the server', 'danger');
+            loadPublicIndexes();
+        });
+    }
+
+    // Load public indexes
+    function loadPublicIndexes() {
+        fetch('/api/indexes')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.indexes) {
+                    updateIndexesDropdown(data.indexes, true);
+                    isPublicVideo = true;
+                } else {
+                    showAlert('Error loading indexes', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading public indexes:', error);
+                showAlert('Error loading public indexes', 'danger');
+            });
+    }
+
+
+    function updateIndexesDropdown(indexes, isPublic) {
+        while (projectSelect.options.length > 0) {
+            projectSelect.remove(0);
+        }
+        
+        // Add default option
+        const defaultOption = document.createElement('option');
+        defaultOption.value = "";
+        defaultOption.textContent = "Select an index";
+        defaultOption.disabled = true;
+        defaultOption.selected = true;
+        projectSelect.appendChild(defaultOption);
+        
+        // Add indexes to dropdown
+        indexes.forEach(index => {
+            const option = document.createElement('option');
+            option.value = index.id;
+            option.textContent = index.name;
+            option.dataset.url = index.url;
+            projectSelect.appendChild(option);
+        });
+        
+        // Select first index by default
+        if (indexes.length > 0) {
+            projectSelect.value = indexes[0].id;
+            selectedIndexId = indexes[0].id;
+            isPublicVideo = isPublic;
+            
+            // Update dropdown button text
+            if (dropdownButton) {
+                dropdownButton.textContent = indexes[0].name;
+            }
+            
+            // Update external link
+            if (externalLink) {
+                externalLink.href = indexes[0].url || "#";
+            }
+            
+            // Load videos for selected index
+            loadVideosForIndex(indexes[0].id);
+        }
+    }
+
+    // Load videos for an index
+    function loadVideosForIndex(indexId) {
+        while (videoSelect.options.length > 0) {
+            videoSelect.remove(0);
+        }
+        
+        const loadingOption = document.createElement('option');
+        loadingOption.textContent = "Loading videos...";
+        loadingOption.disabled = true;
+        loadingOption.selected = true;
+        videoSelect.appendChild(loadingOption);
+
+        fetch(`/api/indexes/${indexId}/videos`)
+            .then(response => response.json())
+            .then(data => {
+                // Clear loading option
+                while (videoSelect.options.length > 0) {
+                    videoSelect.remove(0);
+                }
+
+                if (data.status === 'success' && data.videos && data.videos.length > 0) {
+                    // Store videos for reference
+                    currentVideos = data.videos;
+                    
+                    // Add videos to dropdown
+                    data.videos.forEach(video => {
+                        const option = document.createElement('option');
+                        option.value = video.id;
+                        option.textContent = video.name;
+                        option.dataset.thumbnail = video.thumbnailUrl;
+                        videoSelect.appendChild(option);
+                    });
+                    
+                    if (data.videos.length > 0) {
+                        videoSelect.value = data.videos[0].id;
+                        selectVideo(indexId, data.videos[0].id, data.videos[0].name, isPublicVideo);
+                    }
+                } else {
+                    const noVideosOption = document.createElement('option');
+                    noVideosOption.textContent = "No videos found";
+                    noVideosOption.disabled = true;
+                    noVideosOption.selected = true;
+                    videoSelect.appendChild(noVideosOption);
+                    
+                    showAlert('No videos found in this index', 'warning');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading videos:', error);
+                while (videoSelect.options.length > 0) {
+                    videoSelect.remove(0);
+                }
+                
+                const errorOption = document.createElement('option');
+                errorOption.textContent = "Error loading videos";
+                errorOption.disabled = true;
+                errorOption.selected = true;
+                videoSelect.appendChild(errorOption);
+                
+                showAlert('Error loading videos for this index', 'danger');
+            });
+    }
+
+
+    function selectVideo(indexId, videoId, videoName, isPublic) {
+        if (videoSelect) {
+            videoSelect.disabled = true;
+        }
+
+        if (messageInput) {
+            messageInput.disabled = true;
+            messageInput.placeholder = "Loading video...";
+        }
+        
+        showAlert(`Selecting video: ${videoName}...`, 'info');
+        
+        fetch('/api/video/select', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                index_id: indexId,
+                video_id: videoId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (videoSelect) {
+                videoSelect.disabled = false;
+            }
+            
+            if (data.status === 'success') {
+                isPublicVideo = isPublic;
+                selectedVideoId = videoId;
+                
+                showAlert(`Video '${videoName}' selected successfully`, 'success');
+                
+                suggestionCards.forEach(card => {
+                    card.classList.add('active');
+                });
+                
+                if (messageInput) {
+                    messageInput.disabled = false;
+                    messageInput.placeholder = "Ask about this video...";
+                }
+                
+                if (sendButton) {
+                    sendButton.disabled = false;
+                }
+            } else {
+                showAlert(data.message || 'Failed to select video', 'danger');
+            }
+        })
+        .catch(error => {
+            if (videoSelect) {
+                videoSelect.disabled = false;
+            }
+            
+            console.error('Error selecting video:', error);
+            showAlert('Error selecting video', 'danger');
+        });
+    }
 
     function sendMessage() {
         const message = messageInput.value.trim();
-        if (message) {
-            displayUserMessage(message);
-          
-            setTimeout(() => {
-                let response;
-                
-                if (message.toLowerCase().includes('choreography') || message.toLowerCase().includes('dance')) {
-                    response = "I found several synchronized choreography clips from your videos. Here are the top results with timestamps:<br><br>1. 01:24 - 01:53: Group formation change with synchronized arm movements<br>2. 03:12 - 03:42: Mirror dance sequence with perfect timing<br>3. 05:17 - 05:46: Complex synchronized footwork pattern";
-                } else if (message.toLowerCase().includes('lighting') || message.toLowerCase().includes('transition')) {
-                    response = "I found these notable lighting transitions in your videos:<br><br>1. 02:15 - 02:25: Dramatic shift from cool blue to warm amber<br>2. 04:37 - 04:50: Spotlight effect that gradually expands to full stage lighting<br>3. 07:12 - 07:30: Strobe effect transitioning to soft backlighting";
-                } else if (message.toLowerCase().includes('iphone') || message.toLowerCase().includes('camera') || message.toLowerCase().includes('setting')) {
-                    response = "I detected these video settings across your uploads:<br><br>1. Main performance: Professional camera setup, 4K resolution, 24fps with shallow depth of field<br>2. Behind the scenes: iPhone 13 Pro footage, 1080p at 60fps<br>3. Interview segments: Canon DSLR with standard 35mm lens, natural lighting setup";
-                } else if (message.toLowerCase().includes('rap') || message.toLowerCase().includes('verse')) {
-                    response = "I found these memorable rap verses in your videos:<br><br>1. 01:45 - 02:12: Fast-paced verse with complex rhyme patterns<br>2. 04:23 - 04:56: Verse with distinctive flow changes and vocal effects<br>3. 06:32 - 07:01: Emotional delivery with standout wordplay";
-                } else if (message.toLowerCase().includes('performance') || message.toLowerCase().includes('standout') || message.toLowerCase().includes('moment')) {
-                    response = "These standout performance moments were identified:<br><br>1. 02:34 - 02:52: High-energy dance break with audience reaction<br>2. 05:12 - 05:38: Powerful vocal high note with dramatic staging<br>3. 07:45 - 08:10: Intimate acoustic segment with emotional delivery";
-                } else {
-                    response = "I've analyzed your video content and can help find specific moments. Try asking me to find choreography sequences, lighting effects, technical details, or standout performances.";
+        if (!message) return;
+        
+        if (!selectedVideoId) {
+            showAlert('Please select a video first', 'warning');
+            return;
+        }
+
+        clearSuggestionsAndShowResults();
+        
+        displayUserMessage(message);
+        
+        const selectedModel = modelSelector.value === '1' ? 'gpt4o' : 'gemini';
+
+        const loadingMessage = displayBotMessage("Analyzing your request...", true);
+        
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        
+        // Send query to server
+        fetch('/api/search', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: message,
+                model: selectedModel
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (loadingMessage && loadingMessage.parentNode === searchResults) {
+                searchResults.removeChild(loadingMessage);
+            }
+            
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+            
+            if (data.status === 'success') {
+                if (data.responses.pegasus) {
+                    displayBotMessageInPanel('rightPanelResults', data.responses.pegasus, 'Pegasus Model');
                 }
                 
-                displayBotMessage(response);
-                messageInput.value = '';
-            }, 1000);
+                if (data.responses[selectedModel]) {
+                    const modelName = selectedModel === 'gemini' ? 'Gemini Model' : 'GPT-4o Model';
+                    displayBotMessageInPanel('leftPanelResults', data.responses[selectedModel], modelName);
+                }
+                
+                const combinedResponse = "Analysis complete. Check both panels for detailed results.";
+                displayBotMessage(combinedResponse);
+            } else {
+                showAlert(data.message || 'Failed to analyze video', 'danger');
+                displayBotMessage("Sorry, I encountered an error while analyzing your request.");
+            }
+        })
+        .catch(error => {
+            console.error('Error sending message:', error);
+            
+            if (loadingMessage && loadingMessage.parentNode === searchResults) {
+                searchResults.removeChild(loadingMessage);
+            }
+            
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            
+            showAlert('Error communicating with the server: ' + error.message, 'danger');
+            displayBotMessage("Sorry, I encountered an error while analyzing your request. Please check the server logs for details.");
+        });
+        
+        messageInput.value = '';
+    }
+
+    // Function to clear suggestions and show results panels
+    function clearSuggestionsAndShowResults() {
+        if (leftPanel) {
+            const leftSuggestions = leftPanel.querySelectorAll('.suggestion-card');
+            const leftTitle = leftPanel.querySelector('.section-title');
+            const leftSelect = leftPanel.querySelector('.form-select');
+            const leftHr = leftPanel.querySelector('hr');
+            
+            // Save title and select
+            if (leftTitle && leftSelect) {
+                leftPanel.innerHTML = '';
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'd-flex align-items-center gap-2 justify-content-between';
+                headerDiv.appendChild(leftTitle);
+                
+                const selectDiv = document.createElement('div');
+                selectDiv.appendChild(leftSelect);
+                
+                headerDiv.appendChild(selectDiv);
+                leftPanel.appendChild(headerDiv);
+                
+                const newHr = document.createElement('hr');
+                leftPanel.appendChild(newHr);
+                
+                const resultsDiv = document.createElement('div');
+                resultsDiv.id = 'leftPanelResults';
+                resultsDiv.className = 'panel-results';
+                leftPanel.appendChild(resultsDiv);
+            }
         }
+        
+        // Clear suggestions in right panel
+        if (rightPanel) {
+            const rightSuggestions = rightPanel.querySelectorAll('.suggestion-card');
+            const rightTitle = rightPanel.querySelector('.section-title');
+            const rightSelect = rightPanel.querySelector('.form-select');
+            const rightHr = rightPanel.querySelector('hr');
+            
+            if (rightTitle && rightSelect) {
+                rightPanel.innerHTML = '';
+                
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'd-flex align-items-center gap-2 justify-content-between';
+                headerDiv.appendChild(rightTitle);
+                
+                const selectDiv = document.createElement('div');
+                selectDiv.appendChild(rightSelect);
+                
+                headerDiv.appendChild(selectDiv);
+                rightPanel.appendChild(headerDiv);
+                
+                const newHr = document.createElement('hr');
+                rightPanel.appendChild(newHr);
+                
+                const resultsDiv = document.createElement('div');
+                resultsDiv.id = 'rightPanelResults';
+                resultsDiv.className = 'panel-results';
+                rightPanel.appendChild(resultsDiv);
+            }
+        }
+    }
+
+    function displayBotMessageInPanel(panelId, message, sourceName) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        
+        const typingIndicator = document.createElement('div');
+        typingIndicator.className = 'card mb-3';
+        typingIndicator.style.maxWidth = '100%';
+        typingIndicator.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex">
+                    <div class="spinner-grow spinner-grow-sm text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div>Analyzing...</div>
+                </div>
+            </div>
+        `;
+        
+        panel.appendChild(typingIndicator);
+        
+        setTimeout(() => {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'card mb-3';
+            messageEl.style.maxWidth = '100%';
+            
+            messageEl.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong class="text-success">${sourceName}</strong>
+                        <small class="text-muted">${getCurrentTime()}</small>
+                    </div>
+                    <div class="card-text mb-0">${message}</div>
+                </div>
+            `;
+            
+            panel.replaceChild(messageEl, typingIndicator);
+        }, 1200);
     }
 
     function displayUserMessage(message) {
         if (!searchResults) return;
- 
+
         const messageEl = document.createElement('div');
         messageEl.className = 'card mb-3 ms-auto';
         messageEl.style.maxWidth = '80%';
@@ -198,70 +598,51 @@ document.addEventListener('DOMContentLoaded', function() {
         scrollToBottom();
     }
 
-
-    function displayBotMessage(message) {
+    function displayBotMessage(message, isLoading = false) {
         if (!searchResults) return;
- 
-        const typingIndicator = document.createElement('div');
-        typingIndicator.className = 'card mb-3';
-        typingIndicator.style.maxWidth = '80%';
-        typingIndicator.innerHTML = `
-            <div class="card-body">
-                <div class="d-flex">
-                    <div class="spinner-grow spinner-grow-sm text-primary me-2" role="status">
-                        <span class="visually-hidden">Loading...</span>
+
+        const messageEl = document.createElement('div');
+        messageEl.className = 'card mb-3';
+        messageEl.style.maxWidth = '80%';
+        
+        if (isLoading) {
+            messageEl.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex">
+                        <div class="spinner-grow spinner-grow-sm text-primary me-2" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div>Model is analyzing...</div>
                     </div>
-                    <div>Jockey is typing...</div>
                 </div>
-            </div>
-        `;
-        
-        searchResults.appendChild(typingIndicator);
-        scrollToBottom();
-        
-        // Replace typing indicator with actual message after a delay
-        setTimeout(() => {
-            // Create message element
-            const messageEl = document.createElement('div');
-            messageEl.className = 'card mb-3';
-            messageEl.style.maxWidth = '80%';
-            
+            `;
+        } else {
             messageEl.innerHTML = `
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <strong class="text-success">Jockey</strong>
+                        <strong class="text-success">Model Eval</strong>
                         <small class="text-muted">${getCurrentTime()}</small>
                     </div>
                     <div class="card-text mb-0">${message}</div>
                 </div>
             `;
-            
-            // Replace typing indicator with actual message
-            searchResults.replaceChild(messageEl, typingIndicator);
-            scrollToBottom();
-        }, 1000);
+        }
+        
+        searchResults.appendChild(messageEl);
+        scrollToBottom();
+        
+        return messageEl;
     }
 
-    // Function to get current time
-    function getCurrentTime() {
-        const now = new Date();
-        let hours = now.getHours();
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        
-        hours = hours % 12;
-        hours = hours ? hours : 12; // Convert 0 to 12
-        
-        return `${hours}:${minutes} ${ampm}`;
-    }
-
-    // Function to scroll chat to bottom
     function scrollToBottom() {
-        const container = searchResults.parentElement;
-        container.scrollTop = container.scrollHeight;
+        if (searchResults) {
+            const container = searchResults.parentElement;
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
     }
 
-    // Function to show alerts
     function showAlert(message, type) {
         if (!alertContainer) return;
         
@@ -273,8 +654,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         alertContainer.appendChild(alert);
-        
-        // Auto dismiss after 5 seconds
+
         setTimeout(() => {
             alert.classList.remove('show');
             setTimeout(() => {
@@ -310,18 +690,52 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-
-    if (searchResults) {
-        searchResults.style.minHeight = '300px';
-        searchResults.style.maxHeight = '500px';
-        searchResults.style.overflowY = 'auto';
-        searchResults.style.padding = '1rem';
-        searchResults.style.marginBottom = '2rem';  
+    function getCurrentTime() {
+        const now = new Date();
+        let hours = now.getHours();
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        
+        hours = hours % 12;
+        hours = hours ? hours : 12; 
+        
+        return `${hours}:${minutes} ${ampm}`;
     }
 
-    const savedApiKey = localStorage.getItem('apiKey');
-    if (savedApiKey) {
-        updateApiStatus(true);
+    // Initialize model availability check
+    function checkModelAvailability() {
+        fetch('/api/models')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+
+                    if (!data.models.gemini && !data.models.gpt4o) {
+                        if (modelSelector) {
+                            modelSelector.disabled = true;
+                        }
+                        showAlert('Additional AI models (Gemini, GPT-4o) are not available. Using Pegasus only.', 'info');
+                    } else if (!data.models.gpt4o) {
+                        // If GPT-4o is not available, disable that option
+                        if (modelSelector && modelSelector.options[1]) {
+                            modelSelector.options[1].disabled = true;
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking model availability:', error);
+            });
     }
 
+    // disable message input and button until video is selected
+    if (messageInput) {
+        messageInput.disabled = true;
+        messageInput.placeholder = "Select a video first...";
+    }
+    
+    if (sendButton) {
+        sendButton.disabled = true;
+    }
+
+    checkModelAvailability();
 });
