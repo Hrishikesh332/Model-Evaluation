@@ -30,12 +30,19 @@
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            <div id="videoSelectContainer" class="p-2">
-                                <label class="form-label fw-bold mb-2">Select Video:</label>
-                                <select id="videoSelect" class="form-select">
-                                    <option value="" selected disabled>Select a video</option>
-                                </select>
+                            <!-- Replace the standard video select dropdown with this custom version -->
+                        <div class="custom-select-container">
+                            <select id="videoSelect" class="form-select d-none">
+                            <!-- Options will be added by JavaScript -->
+                            </select>
+                            <div class="custom-select form-control">
+                            <span class="selected-text">Select a video</span>
+                            <span class="dropdown-arrow">▼</span>
                             </div>
+                            <div class="custom-options" style="display:none;">
+                            <!-- Options will be added by JavaScript -->
+                            </div>
+                        </div>
                         </li>
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#newProjectModal">Create New Project</a></li>
@@ -138,7 +145,7 @@
                         <line x1="17" y1="2" x2="17" y2="22"/>
                         <line x1="2" y1="12" x2="22" y2="12"/>
                     </svg>
-                    Find 10 synchronized choreography clips
+                    Provide a scene by scene breakdown of this video
                 </div>
                 <div class="suggestion-card">
                     <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -147,13 +154,13 @@
                         <line x1="12" y1="19" x2="12" y2="23"/>
                         <line x1="8" y1="23" x2="16" y2="23"/>
                     </svg>
-                    Find 3 memorable rap verses
+                    Compare the beginning and ending segments of this video
                 </div>
                 <div class="suggestion-card">
                     <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                     </svg>
-                    Show standout performance moments
+                    Explain standout performance moments
                 </div>
             </div>
             <div class="col-lg-6 border-start full-height-border">

@@ -233,7 +233,6 @@ document.addEventListener('DOMContentLoaded', function() {
             projectSelect.remove(0);
         }
         
-        // Add default option
         const defaultOption = document.createElement('option');
         defaultOption.value = "";
         defaultOption.textContent = "Select an index";
@@ -241,7 +240,6 @@ document.addEventListener('DOMContentLoaded', function() {
         defaultOption.selected = true;
         projectSelect.appendChild(defaultOption);
         
-        // Add indexes to dropdown
         indexes.forEach(index => {
             const option = document.createElement('option');
             option.value = index.id;
@@ -271,6 +269,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    
     // Load videos for an index
     function loadVideosForIndex(indexId) {
         while (videoSelect.options.length > 0) {
@@ -395,6 +394,98 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+
+    function displayLoadingInPanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return null;
+        
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'card mb-3 loading-indicator';
+        loadingIndicator.style.maxWidth = '100%';
+        loadingIndicator.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex">
+                    <div class="spinner-grow spinner-grow-sm text-primary me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <div>Analyzing...</div>
+                </div>
+            </div>
+        `;
+        
+        panel.appendChild(loadingIndicator);
+        return loadingIndicator;
+    }
+    
+
+    function displayUserMessageInPanel(panelId, message) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+    
+        const messageEl = document.createElement('div');
+        messageEl.className = 'card mb-3 ms-auto';
+        messageEl.style.maxWidth = '80%';
+        
+        messageEl.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong class="text-primary">You</strong>
+                    <small class="text-muted">${getCurrentTime()}</small>
+                </div>
+                <p class="card-text mb-0">${message}</p>
+            </div>
+        `;
+        
+        panel.appendChild(messageEl);
+    }
+    
+    function replaceLoadingWithResponse(panelId, loadingElement, message, sourceName) {
+        const panel = document.getElementById(panelId);
+        if (!panel || !loadingElement) return;
+        
+        const messageEl = document.createElement('div');
+        messageEl.className = 'card mb-3';
+        messageEl.style.maxWidth = '100%';
+        
+        const formattedMessage = renderMarkdown(message);
+        
+        messageEl.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <strong class="text-success">${sourceName}</strong>
+                    <small class="text-muted">${getCurrentTime()}</small>
+                </div>
+                <div class="card-text mb-0">${formattedMessage}</div>
+            </div>
+        `;
+        
+        if (loadingElement.parentNode === panel) {
+            panel.replaceChild(messageEl, loadingElement);
+        } else {
+            panel.appendChild(messageEl);
+        }
+    }
+    
+    function renderMarkdown(text) {
+        if (!text) return '';
+ 
+        text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        text = text.replace(/^### (.*?)$/gm, '<h5>$1</h5>');
+        text = text.replace(/^## (.*?)$/gm, '<h4>$1</h4>');
+        text = text.replace(/^# (.*?)$/gm, '<h3>$1</h3>');
+        text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\n/g, '<br>');
+
+        text = text.replace(/^\* (.*?)$/gm, '<li>$1</li>');
+        text = text.replace(/^(\d+)\. (.*?)$/gm, '<li>$2</li>');
+        
+        text = text.replace(/(\d{1,2}:\d{2}(?::\d{2})?(?:-\d{1,2}:\d{2}(?::\d{2})?)?)/g, '<span class="badge bg-secondary">$1</span>');
+        
+        return text;
+    }
+
     function sendMessage() {
         const message = messageInput.value.trim();
         if (!message) return;
@@ -403,17 +494,27 @@ document.addEventListener('DOMContentLoaded', function() {
             showAlert('Please select a video first', 'warning');
             return;
         }
-
+    
         clearSuggestionsAndShowResults();
         
+        // Display user message in the main chat area
         displayUserMessage(message);
         
+        // Display user message in both left and right panels
+        displayUserMessageInPanel('leftPanelResults', message);
+        displayUserMessageInPanel('rightPanelResults', message);
+        
         const selectedModel = modelSelector.value === '1' ? 'gpt4o' : 'gemini';
-
+    
+        // Add a temporary loading message in the main chat area
         const loadingMessage = displayBotMessage("Analyzing your request...", true);
         
         messageInput.disabled = true;
         sendButton.disabled = true;
+        
+        // Create loading indicators in each panel
+        const leftPanelLoading = displayLoadingInPanel('leftPanelResults');
+        const rightPanelLoading = displayLoadingInPanel('rightPanelResults');
         
         // Send query to server
         fetch('/api/search', {
@@ -433,6 +534,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(data => {
+            // Remove the main loading message
             if (loadingMessage && loadingMessage.parentNode === searchResults) {
                 searchResults.removeChild(loadingMessage);
             }
@@ -442,18 +544,31 @@ document.addEventListener('DOMContentLoaded', function() {
             messageInput.focus();
             
             if (data.status === 'success') {
+                // Replace the loading indicators with actual responses
                 if (data.responses.pegasus) {
-                    displayBotMessageInPanel('rightPanelResults', data.responses.pegasus, 'Pegasus Model');
+                    replaceLoadingWithResponse('rightPanelResults', rightPanelLoading, data.responses.pegasus, 'Pegasus Model');
                 }
                 
                 if (data.responses[selectedModel]) {
                     const modelName = selectedModel === 'gemini' ? 'Gemini Model' : 'GPT-4o Model';
-                    displayBotMessageInPanel('leftPanelResults', data.responses[selectedModel], modelName);
+                    replaceLoadingWithResponse('leftPanelResults', leftPanelLoading, data.responses[selectedModel], modelName);
                 }
                 
                 const combinedResponse = "Analysis complete. Check both panels for detailed results.";
                 displayBotMessage(combinedResponse);
             } else {
+                // Remove loading indicators and show error
+                const leftPanel = document.getElementById('leftPanelResults');
+                const rightPanel = document.getElementById('rightPanelResults');
+                
+                if (leftPanel && leftPanelLoading && leftPanelLoading.parentNode === leftPanel) {
+                    leftPanel.removeChild(leftPanelLoading);
+                }
+                
+                if (rightPanel && rightPanelLoading && rightPanelLoading.parentNode === rightPanel) {
+                    rightPanel.removeChild(rightPanelLoading);
+                }
+                
                 showAlert(data.message || 'Failed to analyze video', 'danger');
                 displayBotMessage("Sorry, I encountered an error while analyzing your request.");
             }
@@ -461,8 +576,20 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error sending message:', error);
             
+            // Remove all loading indicators
             if (loadingMessage && loadingMessage.parentNode === searchResults) {
                 searchResults.removeChild(loadingMessage);
+            }
+            
+            const leftPanel = document.getElementById('leftPanelResults');
+            const rightPanel = document.getElementById('rightPanelResults');
+            
+            if (leftPanel && leftPanelLoading && leftPanelLoading.parentNode === leftPanel) {
+                leftPanel.removeChild(leftPanelLoading);
+            }
+            
+            if (rightPanel && rightPanelLoading && rightPanelLoading.parentNode === rightPanel) {
+                rightPanel.removeChild(rightPanelLoading);
             }
             
             messageInput.disabled = false;
@@ -538,44 +665,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function displayBotMessageInPanel(panelId, message, sourceName) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
-        
-        const typingIndicator = document.createElement('div');
-        typingIndicator.className = 'card mb-3';
-        typingIndicator.style.maxWidth = '100%';
-        typingIndicator.innerHTML = `
-            <div class="card-body">
-                <div class="d-flex">
-                    <div class="spinner-grow spinner-grow-sm text-primary me-2" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <div>Analyzing...</div>
-                </div>
-            </div>
-        `;
-        
-        panel.appendChild(typingIndicator);
-        
-        setTimeout(() => {
-            const messageEl = document.createElement('div');
-            messageEl.className = 'card mb-3';
-            messageEl.style.maxWidth = '100%';
-            
-            messageEl.innerHTML = `
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <strong class="text-success">${sourceName}</strong>
-                        <small class="text-muted">${getCurrentTime()}</small>
-                    </div>
-                    <div class="card-text mb-0">${message}</div>
-                </div>
-            `;
-            
-            panel.replaceChild(messageEl, typingIndicator);
-        }, 1200);
-    }
 
     function displayUserMessage(message) {
         if (!searchResults) return;
@@ -665,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     }
 
-    // Function to update API status display
+ 
     function updateApiStatus(connected) {
         if (!apiStatus) return;
         
@@ -702,7 +791,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${hours}:${minutes} ${ampm}`;
     }
 
-    // Initialize model availability check
     function checkModelAvailability() {
         fetch('/api/models')
             .then(response => response.json())

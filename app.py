@@ -371,7 +371,7 @@ def generate_gpt4o_response(prompt, video_path=None):
         if video_path and os.path.exists(video_path):
             messages.append({
                 "role": "user", 
-                "content": f"[Video Analysis Request] The following query is about a video that likely contains performances, music videos, or dance routines. Please provide a detailed analysis: {prompt}"
+                "content": f"Please provide a detailed analysis: {prompt}"
             })
         else:
             messages.append({"role": "user", "content": prompt})
