@@ -108,7 +108,7 @@ body {
 }
 
 .api-status {
-    color: #6c757d;
+    color: #60E21B;
     font-size: 0.9rem;
     cursor: pointer;
     display: flex;
@@ -117,7 +117,7 @@ body {
 }
 
 .api-status:hover {
-    color: #495057;
+    color: #60E21B;
 }
 
 .main-content {
@@ -220,7 +220,7 @@ body {
 
 .section-title {
     font-size: 1.1rem;
-    color: #495057;
+    color: #60E21B;
     margin-bottom: 1.5rem;
     font-weight: 500;
     padding-bottom: 0.5rem;
@@ -525,7 +525,7 @@ code {
 
 .dropdown-arrow {
     margin-left: 8px;
-    color: #6c757d;
+    color: #60E21B;
 }
 
 

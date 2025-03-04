@@ -15,6 +15,8 @@ from google.generativeai import types as genai_types
 import time
 import base64
 
+import cv2
+
 import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -362,7 +364,6 @@ def generate_gemini_response(prompt, video_path=None):
 
 
 def generate_gpt4o_response(prompt, video_path=None):
-
     try:
         api_key = session.get('openai_api_key', OPENAI_API_KEY)
         if not api_key:
@@ -370,34 +371,66 @@ def generate_gpt4o_response(prompt, video_path=None):
         
         client = OpenAI(api_key=api_key)
         
-        messages = [
-            {"role": "system", "content": "You are a helpful AI assistant that analyzes videos and provides insightful responses."}
-        ]
+        if not video_path or not os.path.exists(video_path):
+            messages = [
+                {"role": "system", "content": "You are a helpful AI assistant that analyzes videos."},
+                {"role": "user", "content": prompt}
+            ]
+            
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                max_tokens=1000
+            )
+            
+            return completion.choices[0].message.content
         
-        if video_path and os.path.exists(video_path):
-            messages.append({
-                "role": "user", 
-                "content": f"Please provide a detailed analysis: {prompt}"
+        print(f"Processing video for GPT-4o: {video_path}")
+        base64Frames = []
+        video = cv2.VideoCapture(video_path)
+        
+        total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+        sample_interval = max(total_frames // 10, 1)
+        
+        for frame_idx in range(0, total_frames, sample_interval):
+            video.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+            success, frame = video.read()
+            if not success:
+                continue
+            
+            frame = cv2.resize(frame, (320, 180))
+            _, buffer = cv2.imencode(".jpg", frame)
+            base64Frames.append(base64.b64encode(buffer).decode("utf-8"))
+        
+            if len(base64Frames) >= 10:
+                break
+        
+        video.release()
+        
+        if not base64Frames:
+            return "Error: Could not extract frames from video."
+        
+        content = [{"type": "text", "text": prompt}]
+        for frame in base64Frames:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{frame}"}
             })
-        else:
-            messages.append({"role": "user", "content": prompt})
         
         completion = client.chat.completions.create(
             model="gpt-4o",
-            messages=messages,
-            response_format={"type": "text"},
-            temperature=1,
-            max_tokens=2048,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
+            messages=[
+                {"role": "system", "content": "You are a helpful AI assistant that analyzes videos."},
+                {"role": "user", "content": content}
+            ],
+            max_tokens=1000
         )
         
         return completion.choices[0].message.content
+        
     except Exception as e:
-        print(f"Error generating GPT-4o response: {str(e)}")
-        return f"An error occurred while generating a response: {str(e)}"
-
+        print(f"Error in GPT-4o response: {str(e)}")
+        return f"Error generating GPT-4o response: {str(e)}"
 
 @app.route('/')
 def index():
@@ -525,9 +558,9 @@ def select_video():
     else:
         return jsonify({"status": "error", "message": "Failed to download video"}), 500
 
+
 @app.route('/api/search', methods=['POST'])
 def search_videos():
-    """Analyze selected video with query"""
     print("Search endpoint called")
     query = request.json.get('query')
     selected_model = request.json.get('model', 'gemini')
@@ -566,8 +599,28 @@ def search_videos():
             responses["gemini"] = f"Error generating Gemini response: {str(e)}"
     elif selected_model == 'gpt4o':
         try:
-            gpt4o_response = generate_gpt4o_response(query, video_path)
-            responses["gpt4o"] = gpt4o_response
+
+            if 'generate_gpt4o_response' in globals():
+                gpt4o_response = generate_gpt4o_response(query, video_path)
+                responses["gpt4o"] = gpt4o_response
+                print(f"Responses being sent to frontend: {responses}")
+            else:
+                print("Function generate_gpt4o_response not found, using alternative implementation")
+                if OPENAI_API_KEY:
+                    client = OpenAI(api_key=OPENAI_API_KEY)
+                    messages = [
+                        {"role": "system", "content": "You are a helpful AI assistant that analyzes videos and provides insightful responses."},
+                        {"role": "user", "content": f"Analyze this video query: {query}"}
+                    ]
+                    completion = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=messages,
+                        max_tokens=1024,
+                        temperature=0.7
+                    )
+                    responses["gpt4o"] = completion.choices[0].message.content
+                else:
+                    responses["gpt4o"] = "GPT-4o API key not configured and generate_gpt4o_response function is missing."
         except Exception as e:
             print(f"Error in GPT-4o response: {str(e)}")
             responses["gpt4o"] = f"Error generating GPT-4o response: {str(e)}"
