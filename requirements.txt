@@ -6,4 +6,4 @@ openai
 twelvelabs
 yt-dlp
 gunicorn
-werkzeug==2.0.1
+werkzeug==3.1.3
