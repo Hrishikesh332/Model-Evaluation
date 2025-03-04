@@ -62,6 +62,12 @@ PUBLIC_INDEXES = [
     }
 ]
 
+
+@app.route('/ping')
+def ping():
+    return 'pong', 200
+
+
 PUBLIC_VIDEOS = {
     "public1": [
         {"id": "video1", "name": "BTS Performance", "thumbnailUrl": "/static/img/sample1.jpg"},
