@@ -19,6 +19,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const modelSelector = document.querySelector('.form-select[aria-label="Performance filter"]');
     const techModelSelector = document.querySelector('.form-select[aria-label="Technical filter"]');
 
+    const customSelect = document.querySelector('.custom-select');
+    const customOptions = document.querySelector('.custom-options');
+
+    if (customSelect && customOptions) {
+        // Toggle custom dropdown when clicked
+        customSelect.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            customOptions.style.display = customOptions.style.display === 'none' ? 'block' : 'none';
+        });
+        
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.custom-select-container')) {
+                customOptions.style.display = 'none';
+            }
+        });
+    }
+
     let videoSelectContainer = document.getElementById('videoSelectContainer');
     if (!videoSelectContainer) {
         videoSelectContainer = document.createElement('div');
@@ -30,6 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <select id="videoSelect" class="form-select"></select>
             </div>
         `;
+
+        
         
         // Append to dropdown menu
         const dropdownMenu = document.querySelector('.dropdown-menu');
@@ -43,14 +63,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const videoSelect = document.getElementById('videoSelect');
 
-    // State variables
     let isApiConnected = false;
     let selectedIndexId = null;
     let selectedVideoId = null;
     let isPublicVideo = false;
     let currentVideos = [];
 
-    // Check for existing API key on load
     const savedApiKey = localStorage.getItem('apiKey');
     if (savedApiKey) {
         connectWithApiKey(savedApiKey);
@@ -272,6 +290,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load videos for an index
     function loadVideosForIndex(indexId) {
+        // Update standard select dropdown
         while (videoSelect.options.length > 0) {
             videoSelect.remove(0);
         }
@@ -281,20 +300,31 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingOption.disabled = true;
         loadingOption.selected = true;
         videoSelect.appendChild(loadingOption);
-
+        
+        // Update custom dropdown UI
+        const customSelectText = document.querySelector('.selected-text');
+        if (customSelectText) {
+            customSelectText.textContent = "Loading videos...";
+        }
+        
+        const customOptions = document.querySelector('.custom-options');
+        if (customOptions) {
+            customOptions.innerHTML = '';
+        }
+    
         fetch(`/api/indexes/${indexId}/videos`)
             .then(response => response.json())
             .then(data => {
-                // Clear loading option
+                // Clear loading options
                 while (videoSelect.options.length > 0) {
                     videoSelect.remove(0);
                 }
-
+    
                 if (data.status === 'success' && data.videos && data.videos.length > 0) {
                     // Store videos for reference
                     currentVideos = data.videos;
                     
-                    // Add videos to dropdown
+                    // 1. Update standard select dropdown
                     data.videos.forEach(video => {
                         const option = document.createElement('option');
                         option.value = video.id;
@@ -303,22 +333,83 @@ document.addEventListener('DOMContentLoaded', function() {
                         videoSelect.appendChild(option);
                     });
                     
+                    // 2. Update custom dropdown UI
+                    if (customOptions) {
+                        customOptions.innerHTML = '';
+                        
+                        data.videos.forEach(video => {
+                            const option = document.createElement('div');
+                            option.className = 'custom-option';
+                            option.dataset.value = video.id;
+                            
+                            option.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <img src="${video.thumbnailUrl}" alt="${video.name}" class="video-thumbnail-small me-2">
+                                    <span>${video.name}</span>
+                                </div>
+                            `;
+                            
+                            option.addEventListener('click', function() {
+                                // Update the custom select display
+                                if (customSelectText) {
+                                    customSelectText.innerHTML = `
+                                        <div class="d-flex align-items-center">
+                                            <img src="${video.thumbnailUrl}" alt="${video.name}" class="video-thumbnail-small me-2">
+                                            <span>${video.name}</span>
+                                        </div>
+                                    `;
+                                }
+                                
+                                // Hide the options
+                                customOptions.style.display = 'none';
+                                
+                                // Select the video in the standard dropdown (for state management)
+                                if (videoSelect) {
+                                    videoSelect.value = video.id;
+                                }
+                                
+                                // Call the selectVideo function
+                                selectVideo(indexId, video.id, video.name, isPublicVideo);
+                            });
+                            
+                            customOptions.appendChild(option);
+                        });
+                    }
+                    
+                    // Select first video by default
                     if (data.videos.length > 0) {
                         videoSelect.value = data.videos[0].id;
+                        
+                        // Also update custom dropdown display
+                        if (customSelectText && data.videos[0].thumbnailUrl) {
+                            customSelectText.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <img src="${data.videos[0].thumbnailUrl}" alt="${data.videos[0].name}" class="video-thumbnail-small me-2">
+                                    <span>${data.videos[0].name}</span>
+                                </div>
+                            `;
+                        }
+                        
                         selectVideo(indexId, data.videos[0].id, data.videos[0].name, isPublicVideo);
                     }
                 } else {
+                    // No videos found
                     const noVideosOption = document.createElement('option');
                     noVideosOption.textContent = "No videos found";
                     noVideosOption.disabled = true;
                     noVideosOption.selected = true;
                     videoSelect.appendChild(noVideosOption);
                     
+                    if (customSelectText) {
+                        customSelectText.textContent = "No videos found";
+                    }
+                    
                     showAlert('No videos found in this index', 'warning');
                 }
             })
             .catch(error => {
                 console.error('Error loading videos:', error);
+                // Clear dropdowns and show error
                 while (videoSelect.options.length > 0) {
                     videoSelect.remove(0);
                 }
@@ -329,9 +420,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorOption.selected = true;
                 videoSelect.appendChild(errorOption);
                 
+                if (customSelectText) {
+                    customSelectText.textContent = "Error loading videos";
+                }
+                
                 showAlert('Error loading videos for this index', 'danger');
             });
     }
+
 
 
     function selectVideo(indexId, videoId, videoName, isPublic) {

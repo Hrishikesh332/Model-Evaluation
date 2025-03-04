@@ -210,7 +210,7 @@ body {
     border: none;
     padding: 0.75rem 1rem;
     cursor: pointer;
-    color: #28a745;
+    color: #60E21B;
     transition: color 0.2s;
 }
 
@@ -246,11 +246,18 @@ body {
 }
 
 .form-control:focus {
-    border-color: #80bdff;
-    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+    border-color: #60E21B;
+    box-shadow: 0 0 0 0.2rem rgba(161, 247, 95, 0.25);
 }
 
-/* Panel results styles */
+.spinner-grow.spinner-grow-sm.text-primary {
+    color: #60E21B !important;
+}
+
+.text-primary {
+    color: #000000 !important;
+}
+
 .panel-results {
     height: 400px;
     overflow-y: auto;
@@ -269,10 +276,9 @@ body {
 }
 
 .panel-results .text-success {
-    color: #28a745 !important;
+    color: #60E21B !important;
 }
 
-/* Animation for transitions */
 .panel-results .card {
     animation: fadeIn 0.3s ease-in-out;
 }
@@ -306,7 +312,6 @@ body {
     }
 }
 
-/* Loading indicator styles */
 .loading {
     position: relative;
 }
@@ -335,7 +340,7 @@ body {
     margin-top: -15px;
     margin-left: -15px;
     border: 3px solid #f3f3f3;
-    border-top: 3px solid #3498db;
+    border-top: 3px solid #28a745;
     border-radius: 50%;
     animation: spin 1s linear infinite;
     z-index: 11;
@@ -346,8 +351,6 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-
-/* Add these styles to your style.css file */
 .custom-select-container {
     position: relative;
     width: 100%;
@@ -413,4 +416,153 @@ code {
 
 .badge.bg-secondary {
     font-family: monospace;
+}
+
+
+.custom-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.custom-select {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+}
+
+.custom-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.custom-option {
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
+}
+
+.custom-option:hover {
+    background-color: #f8f9fa;
+}
+
+.video-thumbnail-small {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.selected-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.custom-select-container {
+    position: relative;
+    width: 100%;
+}
+
+.custom-select {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.375rem 0.75rem;
+}
+
+.custom-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.custom-option {
+    padding: 0.375rem 0.75rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.custom-option:hover {
+    background-color: #f8f9fa;
+}
+
+.custom-option.selected {
+    background-color: #e9ecef;
+}
+
+.video-thumbnail-small {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.selected-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dropdown-arrow {
+    margin-left: 8px;
+    color: #6c757d;
+}
+
+
+.custom-heading {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+}
+
+#apiModal .modal-content {
+    border-radius: 8px;
+    border: none;
+}
+
+#apiModal .modal-body {
+    padding: 24px;
+}
+
+#apiModal .btn-outline-secondary {
+    border-color: #ced4da;
+    color: #6c757d;
+}
+
+#apiModal .btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+}
+
+#apiModal .btn-primary {
+    background-color: #60E21B;
+}
+
+#apiModal .btn-primary:disabled {
+    opacity: 0.5;
+    background-color: #adb5bd;
+    cursor: not-allowed;
+}
+
+.h-3 {
+    height: 0.75rem;
 }
