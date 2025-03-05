@@ -355,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             option.innerHTML = `
                                 <div class="d-flex align-items-center">
-                                    <img src="${video.thumbnailUrl}" alt="${video.name}" class="video-thumbnail-small me-2">
+                                <img src="${video.thumbnailUrl}" alt="${video.name}" class="video-thumbnail-small me-2">
                                     <span>${video.name}</span>
                                 </div>
                             `;

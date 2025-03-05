@@ -69,6 +69,16 @@ PUBLIC_INDEXES = [
 def ping():
     return 'pong', 200
 
+def keep_alive():
+    while True:
+        try:
+            app_url = os.getenv("APP_URL", "https://model-evaluation.onrender.com/")
+            requests.get(f"{app_url}/ping")
+            print("Server pinged successfully")
+        except Exception as e:
+            print(f"Failed to ping server: {e}")
+    
+        time.sleep(600)
 
 PUBLIC_VIDEOS = {
     "public1": [
@@ -183,12 +193,14 @@ def get_video_url(index_id, video_id, api_key):
         print(f"Exception getting video URL: {str(e)}")
         return None
 
+
 @app.route('/api/thumbnails/<index_id>/<video_id>')
 def get_video_thumbnail(index_id, video_id):
     api_key = session.get('twelvelabs_api_key', TWELVELABS_API_KEY)
     
     if not api_key:
-        return "No API key", 401
+        print("No API key available for thumbnail")
+        return app.send_static_file('img/default-thumbnail.jpg')
     
     url = f"https://api.twelvelabs.io/v1.3/indexes/{index_id}/videos/{video_id}/thumbnail"
     headers = {
@@ -197,15 +209,18 @@ def get_video_thumbnail(index_id, video_id):
     }
     
     try:
+        print(f"Requesting thumbnail from: {url}")
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
+            print(f"Thumbnail fetched successfully for video: {video_id}")
             return response.content, 200, {'Content-Type': 'image/jpeg'}
         else:
-            # Return a default thumbnail image
+            print(f"Thumbnail fetch failed with status: {response.status_code}")
             return app.send_static_file('img/default-thumbnail.jpg')
     except Exception as e:
         print(f"Exception getting thumbnail: {str(e)}")
         return app.send_static_file('img/default-thumbnail.jpg')
+
 
 def download_video(url, output_filename):
 
