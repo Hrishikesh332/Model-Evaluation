@@ -1,6 +1,6 @@
-flask==2.2.3
-python-dotenv==1.0.0
-requests==2.28.2
+flask
+python-dotenv
+requests
 google-generativeai
 openai
 twelvelabs
