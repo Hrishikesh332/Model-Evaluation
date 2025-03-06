@@ -11,6 +11,11 @@ import google.generativeai as genai
 from openai import OpenAI
 from twelvelabs import TwelveLabs
 
+
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime
+import atexit
+
 from google.generativeai import types as genai_types
 import time
 import base64
@@ -65,20 +70,8 @@ PUBLIC_INDEXES = [
 ]
 
 
-@app.route('/ping')
-def ping():
-    return 'pong', 200
 
-def keep_alive():
-    while True:
-        try:
-            app_url = os.getenv("APP_URL", "https://model-evaluation.onrender.com/")
-            requests.get(f"{app_url}/ping")
-            print("Server pinged successfully")
-        except Exception as e:
-            print(f"Failed to ping server: {e}")
-    
-        time.sleep(600)
+
 
 PUBLIC_VIDEOS = {
     "public1": [
@@ -657,6 +650,27 @@ def get_available_models():
         "status": "success", 
         "models": models
     })
+
+def wake_up_app():
+    """Pings the Moody Bomb website to prevent it from sleeping."""
+    try:
+        app_url = os.getenv('APP_URL')  # Assuming you have your app URL in the environment
+        if app_url:
+            response = requests.get(app_url)
+            if response.status_code == 200:
+                print(f"Successfully pinged {app_url} at {datetime.now()}")
+            else:
+                print(f"Failed to ping {app_url} (status code: {response.status_code}) at {datetime.now()}")
+        else:
+            print("APP_URL environment variable not set.")
+    except Exception as e:
+        print(f"Error occurred while pinging app: {e}")
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(wake_up_app, 'interval', minutes=9)  # Run every 9 minutes
+scheduler.start()
+
+atexit.register(lambda: scheduler.shutdown())
 
 if __name__ == '__main__':
     app.run(debug=True)

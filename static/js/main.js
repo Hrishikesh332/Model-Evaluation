@@ -1,15 +1,6 @@
-function keepServerAwake() {
-    fetch('/ping', { method: 'GET' })
-        .then(response => console.log('Server pinged successfully'))
-        .catch(error => console.error('Error pinging server:', error));
-    
-    setTimeout(keepServerAwake, 600000);
-}
-
-
 document.addEventListener('DOMContentLoaded', function() {
 
-    setTimeout(keepServerAwake, 5000);
+  
  
     const suggestionCards = document.querySelectorAll('.suggestion-card');
     const messageInput = document.querySelector('.message-input');
