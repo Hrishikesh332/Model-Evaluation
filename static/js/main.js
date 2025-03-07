@@ -564,9 +564,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+
+    function formatErrorMessage(message) {
+        if (message.startsWith('Error') || message.startsWith('ERROR')) {
+            return `<div class="alert alert-danger">${message}</div>`;
+        }
+        return message;
+    }
+
     function renderMarkdown(text) {
         if (!text) return '';
- 
+        
+        // If the text contains HTML tags from formatErrorMessage, return it as-is
+        if (text.includes('<div class="alert alert-danger">')) {
+            return text;
+        }
+    
+        // Otherwise, process it as normal markdown
         text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
         text = text.replace(/^### (.*?)$/gm, '<h5>$1</h5>');
@@ -575,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
         text = text.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
         text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
         text = text.replace(/\n/g, '<br>');
-
+    
         text = text.replace(/^\* (.*?)$/gm, '<li>$1</li>');
         text = text.replace(/^(\d+)\. (.*?)$/gm, '<li>$2</li>');
         
@@ -583,6 +597,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         return text;
     }
+
 
     function sendMessage() {
         const message = messageInput.value.trim();
@@ -641,21 +656,42 @@ document.addEventListener('DOMContentLoaded', function() {
             sendButton.disabled = false;
             messageInput.focus();
             
-            if (data.status === 'success') {
-                // Replace the loading indicators with actual responses
+            // Handle API responses
+            if (data.status === 'success' || data.status === 'partial') {
+                // Process pegasus response
                 if (data.responses.pegasus) {
-                    replaceLoadingWithResponse('rightPanelResults', rightPanelLoading, data.responses.pegasus, 'Pegasus Model');
+                    let responseText = data.responses.pegasus;
+                    
+                    // Check if there was an error with Pegasus
+                    if (data.errors && data.errors.pegasus) {
+                        responseText = formatErrorMessage(responseText);
+                    }
+                    
+                    replaceLoadingWithResponse('rightPanelResults', rightPanelLoading, responseText, 'Pegasus Model');
                 }
                 
+                // Process the selected model response
                 if (data.responses[selectedModel]) {
                     const modelName = selectedModel === 'gemini' ? 'Gemini Model' : 'GPT-4o Model';
-                    replaceLoadingWithResponse('leftPanelResults', leftPanelLoading, data.responses[selectedModel], modelName);
+                    let responseText = data.responses[selectedModel];
+                    
+                    // Check if there was an error with the selected model
+                    if (data.errors && data.errors[selectedModel]) {
+                        responseText = formatErrorMessage(responseText);
+                    }
+                    
+                    replaceLoadingWithResponse('leftPanelResults', leftPanelLoading, responseText, modelName);
                 }
                 
-                const combinedResponse = "Analysis complete. Check both panels for detailed results.";
-                displayBotMessage(combinedResponse);
+                // Show status message
+                let statusMessage = "Analysis complete. Check both panels for detailed results.";
+                if (data.status === 'partial') {
+                    statusMessage = "Analysis partially complete. Some models encountered errors.";
+                }
+                
+                displayBotMessage(statusMessage);
             } else {
-                // Remove loading indicators and show error
+                // Handle complete failure
                 const leftPanel = document.getElementById('leftPanelResults');
                 const rightPanel = document.getElementById('rightPanelResults');
                 
@@ -699,6 +735,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         messageInput.value = '';
     }
+
+
 
     // Function to clear suggestions and show results panels
     function clearSuggestionsAndShowResults() {
