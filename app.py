@@ -44,6 +44,7 @@ twelvelabs_client = None
 if TWELVELABS_API_KEY:
     twelvelabs_client = TwelveLabs(api_key=TWELVELABS_API_KEY)
 
+
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     generation_config = {
@@ -59,30 +60,18 @@ if OPENAI_API_KEY:
 PUBLIC_INDEXES = [
     {
         "id": "public1",
-        "name": "Hybe_New (Public)",
-        "url": "https://playground.twelvelabs.io/indexes/67900e1181c61d781369699f"
+        "name": "Sports (Public)",
+        "url": "https://playground.twelvelabs.io/indexes/67b4fd1d0814c4ad48ec5c1b", 
+        "index_id":"67b4fd1d0814c4ad48ec5c1b"
     },
     {
         "id": "public2", 
-        "name": "Talent Show (Public)", 
-        "url": "https://playground.twelvelabs.io/indexes/12345"
+        "name": "Social Media (Public)", 
+        "url": "https://playground.twelvelabs.io/indexes/6785dfaa4cdd7e895ce16a25",
+        "index_id":"6785dfaa4cdd7e895ce16a25"
     }
 ]
 
-
-
-
-
-PUBLIC_VIDEOS = {
-    "public1": [
-        {"id": "video1", "name": "BTS Performance", "thumbnailUrl": "/static/img/sample1.jpg"},
-        {"id": "video2", "name": "SEVENTEEN Dance", "thumbnailUrl": "/static/img/sample2.jpg"}
-    ],
-    "public2": [
-        {"id": "video3", "name": "Singer Audition", "thumbnailUrl": "/static/img/sample3.jpg"},
-        {"id": "video4", "name": "Dance Competition", "thumbnailUrl": "/static/img/sample4.jpg"}
-    ]
-}
 
 def get_twelvelabs_client():
 
@@ -143,15 +132,28 @@ def get_index_videos(index_id, api_key):
         if response.status_code == 200:
             data = response.json()
             if "data" in data and isinstance(data["data"], list):
-                videos = [
-                    {
-                        "id": video.get("_id", ""),
+                videos = []
+
+                for idx, video in enumerate(data.get("data", [])):
+                    video_id = video.get("_id", "")
+                    video_details = get_video_details(index_id, video_id, api_key)
+                    
+                    thumbnail_url = None
+                    if video_details and "hls" in video_details and "thumbnail_urls" in video_details["hls"]:
+   
+                        if video_details["hls"]["thumbnail_urls"]:
+                            thumbnail_url = video_details["hls"]["thumbnail_urls"][0]
+                    
+                    if not thumbnail_url:
+                        thumbnail_url = f"/api/thumbnails/{index_id}/{video_id}"
+                    
+                    videos.append({
+                        "id": video_id,
                         "name": video.get("system_metadata", {}).get("filename", f"Video {idx+1}"),
-                        "thumbnailUrl": f"/api/thumbnails/{index_id}/{video.get('_id', '')}",
+                        "thumbnailUrl": thumbnail_url,
                         "duration": video.get("system_metadata", {}).get("duration", 0)
-                    }
-                    for idx, video in enumerate(data.get("data", []))
-                ]
+                    })
+                    
                 return videos
             else:
                 print(f"Unexpected videos API response structure: {data}")
@@ -162,6 +164,25 @@ def get_index_videos(index_id, api_key):
     except Exception as e:
         print(f"Exception fetching videos: {str(e)}")
         return []
+    
+
+def get_video_details(index_id, video_id, api_key):
+    url = f"https://api.twelvelabs.io/v1.3/indexes/{index_id}/videos/{video_id}?embed=false"
+    headers = {
+        "accept": "application/json",
+        "x-api-key": api_key,
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"Failed to get video details: Status {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"Exception getting video details: {str(e)}")
+        return None
 
 def get_video_url(index_id, video_id, api_key):
     url = f"https://api.twelvelabs.io/v1.3/indexes/{index_id}/videos/{video_id}"
@@ -232,13 +253,28 @@ def download_video(url, output_filename):
         return False
 
 
-def generate_pegasus_response(index_id, video_id, prompt, api_key):
+def generate_pegasus_response(index_id, video_id, prompt, api_key=None):
     try:
-        client = get_twelvelabs_client()
+        public_index = next((index for index in PUBLIC_INDEXES if index['id'] == index_id), None)
+        actual_index_id = session.get('actual_index_id')
+
+        if public_index and not api_key:
+            client = TwelveLabs(api_key=TWELVELABS_API_KEY)
+            if actual_index_id:
+                index_id = actual_index_id
+            else:
+                index_id = public_index.get('index_id')
+            api_key = TWELVELABS_API_KEY
+        elif api_key:
+            client = TwelveLabs(api_key=api_key)
+        else:
+            client = TwelveLabs(api_key=TWELVELABS_API_KEY)
+            api_key = TWELVELABS_API_KEY
+        
         if not client:
             return "TwelveLabs client not initialized. Please check your API key."
             
-        print(f"Generating Pegasus response with video_id: {video_id}, prompt: {prompt}")
+        print(f"Generating Pegasus response with index_id: {index_id}, video_id: {video_id}, prompt: {prompt}")
         
         enhanced_prompt = f"""Analyze the video thoroughly and provide a detailed response to this question: {prompt}
         
@@ -510,9 +546,12 @@ def get_indexes():
     else:
         return jsonify({"status": "success", "indexes": PUBLIC_INDEXES, "public": True})
 
+
 @app.route('/api/indexes/<index_id>/videos', methods=['GET'])
 def get_videos(index_id):
     api_key = session.get('twelvelabs_api_key')
+    
+    public_index = next((index for index in PUBLIC_INDEXES if index['id'] == index_id), None)
     
     if api_key:
         videos = get_index_videos(index_id, api_key)
@@ -520,11 +559,18 @@ def get_videos(index_id):
             return jsonify({"status": "success", "videos": videos})
         else:
             return jsonify({"status": "error", "message": "No videos found in this index"}), 404
-    else:
-        if index_id in PUBLIC_VIDEOS:
-            return jsonify({"status": "success", "videos": PUBLIC_VIDEOS[index_id], "public": True})
+    elif public_index:
+        if TWELVELABS_API_KEY:
+            actual_index_id = public_index.get('index_id')
+            videos = get_index_videos(actual_index_id, TWELVELABS_API_KEY)
+            if videos and len(videos) > 0:
+                return jsonify({"status": "success", "videos": videos, "public": True})
+            else:
+                return jsonify({"status": "error", "message": "No videos found in this public index"}), 404
         else:
-            return jsonify({"status": "error", "message": "Invalid index ID"}), 404
+            return jsonify({"status": "error", "message": "TwelveLabs API key not configured in environment"}), 500
+    else:
+        return jsonify({"status": "error", "message": "Invalid index ID or TwelveLabs API key required"}), 401
 
 @app.route('/api/video/select', methods=['POST'])
 def select_video():
@@ -534,19 +580,40 @@ def select_video():
     if not index_id or not video_id:
         return jsonify({"status": "error", "message": "Index ID and Video ID are required"}), 400
     
+    public_index = next((index for index in PUBLIC_INDEXES if index['id'] == index_id), None)
+  
     session['selected_index_id'] = index_id
     session['selected_video_id'] = video_id
- 
-    if index_id.startswith('public'):
-        return jsonify({
-            "status": "success", 
-            "message": "Public video selected",
-            "video_id": video_id
-        })
+    
+    if public_index:
+        if TWELVELABS_API_KEY:
+            actual_index_id = public_index.get('index_id')
+            video_url = get_video_url(actual_index_id, video_id, TWELVELABS_API_KEY)
+            
+            if not video_url:
+                return jsonify({"status": "error", "message": "Could not get public video URL"}), 404
+            video_filename = f"{video_id}.mp4"
+            output_path = os.path.join(app.config['VIDEO_FOLDER'], video_filename)
+            session['video_path'] = output_path
+            
+            session['actual_index_id'] = actual_index_id
+            
+            if download_video(video_url, output_path):
+                return jsonify({
+                    "status": "success", 
+                    "message": "Public video selected and downloaded successfully",
+                    "video_id": video_id,
+                    "video_path": output_path,
+                    "public": True
+                })
+            else:
+                return jsonify({"status": "error", "message": "Failed to download public video"}), 500
+        else:
+            return jsonify({"status": "error", "message": "TwelveLabs API key not configured in environment"}), 500
     
     api_key = session.get('twelvelabs_api_key')
     if not api_key:
-        return jsonify({"status": "error", "message": "TwelveLabs API key not found"}), 401
+        return jsonify({"status": "error", "message": "TwelveLabs API key not found. Please connect your API key to access private videos."}), 401
     
     video_url = get_video_url(index_id, video_id, api_key)
     if not video_url:
@@ -652,9 +719,8 @@ def get_available_models():
     })
 
 def wake_up_app():
-    """Pings the Moody Bomb website to prevent it from sleeping."""
     try:
-        app_url = os.getenv('APP_URL')  # Assuming you have your app URL in the environment
+        app_url = os.getenv('APP_URL')
         if app_url:
             response = requests.get(app_url)
             if response.status_code == 200:
@@ -667,7 +733,7 @@ def wake_up_app():
         print(f"Error occurred while pinging app: {e}")
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(wake_up_app, 'interval', minutes=9)  # Run every 9 minutes
+scheduler.add_job(wake_up_app, 'interval', minutes=9)
 scheduler.start()
 
 atexit.register(lambda: scheduler.shutdown())
