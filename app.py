@@ -60,15 +60,15 @@ if OPENAI_API_KEY:
 PUBLIC_INDEXES = [
     {
         "id": "public1",
-        "name": "Sports (Public)",
-        "url": "https://playground.twelvelabs.io/indexes/67b4fd1d0814c4ad48ec5c1b", 
-        "index_id":"67b4fd1d0814c4ad48ec5c1b"
+        "name": "Dance (Public)",
+        "url": "https://playground.twelvelabs.io/indexes/67cad67b27d25d1d86e97bd9", 
+        "index_id":"67cad67b27d25d1d86e97bd9"
     },
     {
         "id": "public2", 
-        "name": "Social Media (Public)", 
-        "url": "https://playground.twelvelabs.io/indexes/6785dfaa4cdd7e895ce16a25",
-        "index_id":"6785dfaa4cdd7e895ce16a25"
+        "name": "Sports (Public)", 
+        "url": "https://playground.twelvelabs.io/indexes/67cad6b2f8affe8f9e7b46d0",
+        "index_id":"67cad6b2f8affe8f9e7b46d0"
     }
 ]
 
