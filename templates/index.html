@@ -10,7 +10,7 @@
 <body>
     <div class="top-bar d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <!-- Updated SVG Logo -->
+            <!-- Logo -->
             <div class="logo-container">
                 <svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 204 146.6" width="40px" height="40px">
                     <defs>
@@ -83,6 +83,7 @@
                                     </div>
                                 </div>
                             </div>
+                        </li>
                     </ul>
                 </div>
                 <a href="#" 
@@ -107,7 +108,7 @@
         </div>
     </div>
 
-    <!-- Updated API Connection Modal -->
+    <!-- API Connection Modal -->
     <div class="modal fade" id="apiModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -129,23 +130,26 @@
         </div>
     </div>
 
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
 
     <div class="main-content">
-        <!-- Alert Container -->
-        <div id="alertContainer"></div>
-
-        <div class="row">
+        <div class="row g-0 position-relative">
+            <!-- Center divider with padding -->
+            <div class="center-divider d-none d-lg-block"></div>
+            
             <div class="col-lg-6 border-end full-height-border">
-                <div class="d-flex align-items-center gap-2 justify-content-between">
+                <div class="d-flex align-items-center gap-2 justify-content-between mb-2">
                     <h3 class="section-title mb-0">Models</h3>
                     <div>
                         <select class="form-select form-select-sm" aria-label="Performance filter">
-                            <option selected>gemini-1.5-pro</option>
+                            <option selected>gemini-2.5-pro-preview-05-06</option>
+                            <option>gemini-1.5-pro</option>
                             <option value="1">gpt4o</option>
                         </select>
                     </div>
                 </div>
-                <hr>
+                <hr class="divider">
                 <!-- Left column results will be placed here -->
                 <div id="leftColumnResults" class="model-results-container">
                     <div class="suggestion-card">
@@ -175,7 +179,7 @@
                 </div>
             </div>
             <div class="col-lg-6 border-start full-height-border">
-                <div class="d-flex align-items-center gap-2 justify-content-between">
+                <div class="d-flex align-items-center gap-2 justify-content-between mb-2">
                     <h3 class="section-title mb-0">Twelve Labs Models</h3>
                     <div>
                         <select class="form-select form-select-sm" aria-label="Technical filter">
@@ -183,7 +187,7 @@
                         </select>
                     </div>
                 </div>
-                <hr>
+                <hr class="divider">
                 <!-- Right column results will be placed here -->
                 <div id="rightColumnResults" class="model-results-container">
                     <div class="suggestion-card">
