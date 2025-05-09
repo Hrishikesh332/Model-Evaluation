@@ -18,7 +18,7 @@ For support or to join the conversation, visit our [Discord](https://discord.com
 | Model Name                         | Available ✅ |
 |-----------------------------------|--------------|
 | `pegasus-1.2`                     | ✅           |
-| `gemini-2.5-pro-preview-05-06`   | ✅           |
+| `gemini-2.5-pro-exp-03-25`   | ✅           |
 | `gemini-1.5-pro`                 | ✅           |
 | `gpt-4o`                         | ✅           |
 

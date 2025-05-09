@@ -22,7 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const customOptions = document.querySelector(".custom-options")
   
     if (customSelect && customOptions) {
-
       customSelect.addEventListener("click", (e) => {
         e.preventDefault()
         e.stopPropagation()
@@ -48,7 +47,6 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
           `
   
-      // Append to dropdown menu
       const dropdownMenu = document.querySelector(".dropdown-menu")
       if (dropdownMenu) {
         const hr = document.createElement("hr")
@@ -70,7 +68,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (savedApiKey) {
       connectWithApiKey(savedApiKey)
     } else {
-      // Load public indexes by default
       loadPublicIndexes()
     }
   
@@ -159,7 +156,6 @@ document.addEventListener("DOMContentLoaded", () => {
   
         setTimeout(() => {
           const modalElement = document.getElementById("newProjectModal")
-          // Access bootstrap using the window object
           const modal = window.bootstrap.Modal.getInstance(modalElement)
           if (modal) modal.hide()
   
@@ -169,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
       })
     }
   
-    // Connect with API key
     function connectWithApiKey(apiKey) {
       if (saveApiKeyBtn) {
         saveApiKeyBtn.disabled = true
@@ -208,7 +203,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
   
             const modalElement = document.getElementById("apiModal")
-
             const modal = window.bootstrap.Modal.getInstance(modalElement)
             if (modal) modal.hide()
           } else {
@@ -228,7 +222,6 @@ document.addEventListener("DOMContentLoaded", () => {
         })
     }
   
-    // Load public indexes
     function loadPublicIndexes() {
       fetch("/api/indexes")
         .then((response) => response.json())
@@ -266,7 +259,6 @@ document.addEventListener("DOMContentLoaded", () => {
         projectSelect.appendChild(option)
       })
   
-
       if (indexes.length > 0) {
         projectSelect.value = indexes[0].id
         selectedIndexId = indexes[0].id
@@ -275,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (dropdownButton) {
           dropdownButton.textContent = indexes[0].name
         }
-
+  
         if (externalLink) {
           externalLink.href = indexes[0].url || "#"
         }
@@ -284,7 +276,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   
-
     function loadVideosForIndex(indexId) {
       while (videoSelect.options.length > 0) {
         videoSelect.remove(0)
@@ -309,13 +300,11 @@ document.addEventListener("DOMContentLoaded", () => {
       fetch(`/api/indexes/${indexId}/videos`)
         .then((response) => response.json())
         .then((data) => {
-
           while (videoSelect.options.length > 0) {
             videoSelect.remove(0)
           }
   
           if (data.status === "success" && data.videos && data.videos.length > 0) {
-
             currentVideos = data.videos
   
             data.videos.forEach((video) => {
@@ -325,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
               option.dataset.thumbnail = video.thumbnailUrl
               videoSelect.appendChild(option)
             })
-
+  
             if (customOptions) {
               customOptions.innerHTML = ""
   
@@ -342,7 +331,6 @@ document.addEventListener("DOMContentLoaded", () => {
                               `
   
                 option.addEventListener("click", () => {
-
                   if (customSelectText) {
                     customSelectText.innerHTML = `
                                           <div class="d-flex align-items-center">
@@ -353,7 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
                   }
   
                   customOptions.style.display = "none"
-
+  
                   if (videoSelect) {
                     videoSelect.value = video.id
                   }
@@ -364,7 +352,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 customOptions.appendChild(option)
               })
             }
-
+  
             if (data.videos.length > 0) {
               videoSelect.value = data.videos[0].id
   
@@ -395,7 +383,7 @@ document.addEventListener("DOMContentLoaded", () => {
         })
         .catch((error) => {
           console.error("Error loading videos:", error)
-
+  
           while (videoSelect.options.length > 0) {
             videoSelect.remove(0)
           }
@@ -557,11 +545,11 @@ document.addEventListener("DOMContentLoaded", () => {
   
     function renderMarkdown(text) {
       if (!text) return ""
-
+  
       if (text.includes('<div class="alert alert-danger">')) {
         return text
       }
-
+  
       text = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       text = text.replace(/\*(.*?)\*/g, "<em>$1</em>")
       text = text.replace(/^### (.*?)$/gm, "<h5>$1</h5>")
@@ -591,7 +579,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return
       }
   
-      clearSuggestionsAndShowResults()
+      prepareResultsContainers()
   
       displayUserMessageInPanel("leftPanelResults", message)
       displayUserMessageInPanel("rightPanelResults", message)
@@ -600,7 +588,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (modelSelector.selectedIndex === 0) {
         selectedModel = "gemini-2.5"
       } else if (modelSelector.selectedIndex === 1) {
-        selectedModel = "gemini" 
+        selectedModel = "gemini"
       } else {
         selectedModel = "gpt4o"
       }
@@ -611,7 +599,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const leftPanelLoading = displayLoadingInPanel("leftPanelResults")
       const rightPanelLoading = displayLoadingInPanel("rightPanelResults")
   
-
       fetch("/api/search", {
         method: "POST",
         headers: {
@@ -633,7 +620,6 @@ document.addEventListener("DOMContentLoaded", () => {
           sendButton.disabled = false
           messageInput.focus()
   
-
           if (data.status === "success" || data.status === "partial") {
             if (data.responses.pegasus) {
               let responseText = data.responses.pegasus
@@ -708,64 +694,52 @@ document.addEventListener("DOMContentLoaded", () => {
       messageInput.value = ""
     }
   
-    function clearSuggestionsAndShowResults() {
-      if (leftPanel) {
-        const leftTitle = leftPanel.querySelector(".section-title")
-        const leftSelect = leftPanel.querySelector(".form-select")
-        const leftHr = leftPanel.querySelector("hr")
-
-        if (leftTitle && leftSelect) {
-          leftPanel.innerHTML = ""
-  
-          const headerDiv = document.createElement("div")
-          headerDiv.className = "d-flex align-items-center gap-2 justify-content-between mb-2"
-          headerDiv.appendChild(leftTitle)
-  
-          const selectDiv = document.createElement("div")
-          selectDiv.appendChild(leftSelect)
-  
-          headerDiv.appendChild(selectDiv)
-          leftPanel.appendChild(headerDiv)
-  
-          const newHr = document.createElement("hr")
-          newHr.className = "divider"
-          leftPanel.appendChild(newHr)
-  
-          const resultsDiv = document.createElement("div")
-          resultsDiv.id = "leftPanelResults"
-          resultsDiv.className = "panel-results"
-          leftPanel.appendChild(resultsDiv)
-        }
+    function prepareResultsContainers() {
+      if (!document.getElementById("leftPanelResults")) {
+        createResultsPanel(leftPanel, "leftPanelResults")
       }
   
-      if (rightPanel) {
-        const rightTitle = rightPanel.querySelector(".section-title")
-        const rightSelect = rightPanel.querySelector(".form-select")
-        const rightHr = rightPanel.querySelector("hr")
-  
-        if (rightTitle && rightSelect) {
-          rightPanel.innerHTML = ""
-  
-          const headerDiv = document.createElement("div")
-          headerDiv.className = "d-flex align-items-center gap-2 justify-content-between mb-2"
-          headerDiv.appendChild(rightTitle)
-  
-          const selectDiv = document.createElement("div")
-          selectDiv.appendChild(rightSelect)
-  
-          headerDiv.appendChild(selectDiv)
-          rightPanel.appendChild(headerDiv)
-  
-          const newHr = document.createElement("hr")
-          newHr.className = "divider"
-          rightPanel.appendChild(newHr)
-  
-          const resultsDiv = document.createElement("div")
-          resultsDiv.id = "rightPanelResults"
-          resultsDiv.className = "panel-results"
-          rightPanel.appendChild(resultsDiv)
-        }
+      if (!document.getElementById("rightPanelResults")) {
+        createResultsPanel(rightPanel, "rightPanelResults")
       }
+    }
+  
+    function createResultsPanel(panel, panelId) {
+      if (!panel) return
+  
+      const title = panel.querySelector(".section-title")
+      const select = panel.querySelector(".form-select")
+  
+      const headerContainer = document.createElement("div")
+      headerContainer.className = "header-container"
+  
+      if (title) {
+        const titleClone = title.cloneNode(true)
+        headerContainer.appendChild(titleClone)
+      }
+  
+      if (select) {
+        const controlsContainer = document.createElement("div")
+        controlsContainer.className = "section-controls"
+        const selectClone = select.cloneNode(true)
+        controlsContainer.appendChild(selectClone)
+        headerContainer.appendChild(controlsContainer)
+      }
+  
+      const dividerContainer = document.createElement("div")
+      dividerContainer.className = "divider-container"
+      const divider = document.createElement("hr")
+      divider.className = "divider"
+      dividerContainer.appendChild(divider)
+  
+      const resultsDiv = document.createElement("div")
+      resultsDiv.id = panelId
+      resultsDiv.className = "panel-results"
+  
+      panel.innerHTML = ""
+      panel.appendChild(headerContainer)
+      panel.appendChild(dividerContainer)
+      panel.appendChild(resultsDiv)
     }
   
     function scrollToBottom() {
@@ -778,19 +752,6 @@ document.addEventListener("DOMContentLoaded", () => {
   
       if (rightPanelResults) {
         rightPanelResults.scrollTop = rightPanelResults.scrollHeight
-      }
-    }
-  
-    function ensureProperLayout() {
-      const leftPanelResults = document.getElementById("leftPanelResults")
-      const rightPanelResults = document.getElementById("rightPanelResults")
-  
-      if (leftPanelResults) {
-        leftPanelResults.style.maxHeight = `calc(100vh - 250px)`
-      }
-  
-      if (rightPanelResults) {
-        rightPanelResults.style.maxHeight = `calc(100vh - 250px)`
       }
     }
   
@@ -863,7 +824,6 @@ document.addEventListener("DOMContentLoaded", () => {
               }
               showAlert("Additional AI models (Gemini, GPT-4o) are not available. Using Pegasus only.", "info")
             } else if (!data.models.gpt4o) {
-
               if (modelSelector && modelSelector.options[1]) {
                 modelSelector.options[1].disabled = true
               }
@@ -885,7 +845,5 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   
     checkModelAvailability()
-    ensureProperLayout()
-    window.addEventListener("resize", ensureProperLayout)
   })
   

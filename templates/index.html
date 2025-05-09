@@ -10,7 +10,6 @@
 <body>
     <div class="top-bar d-flex justify-content-between align-items-center">
         <div class="d-flex align-items-center gap-3">
-            <!-- Logo -->
             <div class="logo-container">
                 <svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 204 146.6" width="40px" height="40px">
                     <defs>
@@ -72,14 +71,12 @@
                                 <label class="form-label fw-bold mb-2">Select Video:</label>
                                 <div class="custom-select-container">
                                     <select id="videoSelect" class="form-select d-none">
-                                        <!-- Options will be added by JavaScript -->
                                     </select>
                                     <div class="custom-select form-control">
                                         <span class="selected-text">Select a video</span>
                                         <span class="dropdown-arrow">▼</span>
                                     </div>
                                     <div class="custom-options" style="display:none; max-height: 200px; overflow-y: auto;">
-                                        <!-- Options will be added by JavaScript -->
                                     </div>
                                 </div>
                             </div>
@@ -108,7 +105,6 @@
         </div>
     </div>
 
-    <!-- API Connection Modal -->
     <div class="modal fade" id="apiModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -130,18 +126,16 @@
         </div>
     </div>
 
-    <!-- Alert Container -->
     <div id="alertContainer"></div>
 
     <div class="main-content">
         <div class="row g-0 position-relative">
-            <!-- Center divider with padding -->
             <div class="center-divider d-none d-lg-block"></div>
             
             <div class="col-lg-6 border-end full-height-border">
-                <div class="d-flex align-items-center gap-2 justify-content-between mb-2">
+                <div class="header-container">
                     <h3 class="section-title mb-0">Models</h3>
-                    <div>
+                    <div class="section-controls">
                         <select class="form-select form-select-sm" aria-label="Performance filter">
                             <option selected>gemini-2.5-pro-preview-05-06</option>
                             <option>gemini-1.5-pro</option>
@@ -149,8 +143,9 @@
                         </select>
                     </div>
                 </div>
-                <hr class="divider">
-                <!-- Left column results will be placed here -->
+                <div class="divider-container">
+                    <hr class="divider">
+                </div>
                 <div id="leftColumnResults" class="model-results-container">
                     <div class="suggestion-card">
                         <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -168,7 +163,7 @@
                             <line x1="12" y1="19" x2="12" y2="23"/>
                             <line x1="8" y1="23" x2="16" y2="23"/>
                         </svg>
-                        Compare the beginning and ending segments of video
+                        Compare the beginning and ending segments of this video
                     </div>
                     <div class="suggestion-card">
                         <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -179,16 +174,17 @@
                 </div>
             </div>
             <div class="col-lg-6 border-start full-height-border">
-                <div class="d-flex align-items-center gap-2 justify-content-between mb-2">
+                <div class="header-container">
                     <h3 class="section-title mb-0">Twelve Labs Models</h3>
-                    <div>
+                    <div class="section-controls">
                         <select class="form-select form-select-sm" aria-label="Technical filter">
                             <option selected>pegasus-1.2</option>
                         </select>
                     </div>
                 </div>
-                <hr class="divider">
-                <!-- Right column results will be placed here -->
+                <div class="divider-container">
+                    <hr class="divider">
+                </div>
                 <div id="rightColumnResults" class="model-results-container">
                     <div class="suggestion-card">
                         <svg class="suggestion-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
