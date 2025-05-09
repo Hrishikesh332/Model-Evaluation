@@ -12,6 +12,17 @@ Model Evalaution for the Video Understanding for - Video to Text task is an open
 
 For support or to join the conversation, visit our [Discord](https://discord.com/invite/Sh6BRfakJa).
 
+
+## Available AI Models
+
+| Model Name                         | Available ✅ |
+|-----------------------------------|--------------|
+| `pegasus-1.2`                     | ✅           |
+| `gemini-2.5-pro-preview-05-06`   | ✅           |
+| `gemini-1.5-pro`                 | ✅           |
+| `gpt-4o`                         | ✅           |
+
+
 ## Prerequisites
 
 - Do checkout the requirements file and the Instruction to setup locally.
