@@ -354,113 +354,85 @@ def generate_pegasus_response(index_id, video_id, prompt, api_key=None):
         return f"An error occurred while generating a response: {str(e)}"
 
 
-
-def generate_gemini_response(prompt, video_path=None):
-
+def generate_gemini_response(prompt, video_path=None, model_name="gemini-1.5-pro"):
     try:
         api_key = session.get('gemini_api_key', GEMINI_API_KEY)
         if not api_key:
             return "Gemini API key not configured. Please add it to your environment or connect via API settings."
-        
+
         genai.configure(api_key=api_key)
-        
+        model = genai.GenerativeModel(model_name=model_name)
+
         if not video_path or not os.path.exists(video_path):
-            model = genai.GenerativeModel(model_name="gemini-1.5-pro")
             response = model.generate_content(prompt)
-            return response.text
-        
+            return response.candidates[0].content.parts[0].text
+
         print(f"Processing video for Gemini analysis: {video_path}")
-        
         file_size = os.path.getsize(video_path)
         file_size_mb = file_size / (1024 * 1024)
         print(f"Video file size: {file_size_mb:.2f} MB")
-        
-        try:
-            if file_size_mb > 4:
-                print("Video is too large, extracting key frames instead")
-            
-                
-                video = cv2.VideoCapture(video_path)
-                total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
-                fps = video.get(cv2.CAP_PROP_FPS)
-                duration = total_frames / fps if fps > 0 else 0
-                
-                print(f"Video duration: {duration:.2f} seconds, {total_frames} frames, {fps} fps")
-                
-                num_frames = min(10, total_frames)
-                frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
-                
-                frames = []
-                for idx in frame_indices:
-                    video.set(cv2.CAP_PROP_POS_FRAMES, idx)
-                    success, frame = video.read()
-                    if success:
-                        frame = cv2.resize(frame, (640, 360))
-                        _, buffer = cv2.imencode('.jpg', frame)
-                        img_base64 = base64.b64encode(buffer).decode('utf-8')
-                        frames.append({
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": img_base64
-                            }
-                        })
-                
-                video.release()
-                
-                if not frames:
-                    return "Error: Could not extract frames from the video."
-                
-                multimodal_content = []
-                
-                multimodal_content.append({
-                    "text": f"I'm analyzing key frames from the video to answer: {prompt}\n\nThese are {len(frames)} representative frames from the video:"
-                })
-                
-                multimodal_content.extend(frames)
-                
-                multimodal_content.append({
-                    "text": f"Based on these key frames from the video, please answer: {prompt}"
-                })
-                
-                model = genai.GenerativeModel(model_name="gemini-1.5-pro")
-                response = model.generate_content(multimodal_content)
-                
-                return "Note: The video was too large to process in its entirety. Analysis is based on key frames only.\n\n" + response.text
-            
-            else:
-                with open(video_path, "rb") as f:
-                    video_data = f.read()
-                
-                model = genai.GenerativeModel(model_name="gemini-1.5-pro")
-                
-                multimodal_parts = [
-                    {
+
+        if file_size_mb > 4:
+            print("Video is too large, extracting key frames instead")
+            video = cv2.VideoCapture(video_path)
+            total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = video.get(cv2.CAP_PROP_FPS)
+            duration = total_frames / fps if fps > 0 else 0
+            print(f"Video duration: {duration:.2f} seconds, {total_frames} frames, {fps} fps")
+
+            num_frames = min(10, total_frames)
+            frame_indices = [int(i * total_frames / num_frames) for i in range(num_frames)]
+
+            frames = []
+            for idx in frame_indices:
+                video.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                success, frame = video.read()
+                if success:
+                    frame = cv2.resize(frame, (640, 360))
+                    _, buffer = cv2.imencode('.jpg', frame)
+                    img_base64 = base64.b64encode(buffer).decode('utf-8')
+                    frames.append({
                         "inline_data": {
-                            "mime_type": "video/mp4",
-                            "data": base64.b64encode(video_data).decode('utf-8')
+                            "mime_type": "image/jpeg",
+                            "data": img_base64
                         }
-                    },
-                    {
-                        "text": f"Analyze this video and answer the following question: {prompt}"
+                    })
+
+            video.release()
+
+            if not frames:
+                return "Error: Could not extract frames from the video."
+
+            multimodal_content = []
+            multimodal_content.append({"text": f"I'm analyzing key frames from the video to answer: {prompt}"})
+            multimodal_content.extend(frames)
+            multimodal_content.append({"text": f"Based on these frames, please answer: {prompt}"})
+
+            response = model.generate_content(multimodal_content)
+            return "Note: The video was too large. Analysis is based on key frames.\n\n" + response.candidates[0].content.parts[0].text
+
+        else:
+            with open(video_path, "rb") as f:
+                video_data = f.read()
+
+            multimodal_parts = [
+                {
+                    "inline_data": {
+                        "mime_type": "video/mp4",
+                        "data": base64.b64encode(video_data).decode('utf-8')
                     }
-                ]
-                
-                response = model.generate_content(multimodal_parts)
-                return response.text
-            
-        except Exception as api_error:
-            error_message = str(api_error)
-            print(f"Gemini API error: {error_message}")
-            
-            if "exceeds the limit" in error_message or "too large" in error_message:
-                return f"ERROR: The video is too large for Gemini to process. Token limit exceeded.\n\nPlease try with a shorter video clip or a more specific question about certain timestamps in the video.\n\nError details: {error_message}"
-            else:
-                return f"Gemini API Error: {error_message}"
-            
+                },
+                {
+                    "text": f"Analyze this video and answer: {prompt}"
+                }
+            ]
+
+            response = model.generate_content(multimodal_parts)
+            return response.candidates[0].content.parts[0].text
+
     except Exception as e:
         print(f"Error in generate_gemini_response: {str(e)}")
         return f"Gemini API Error: {str(e)}"
-
 
 # def generate_gemini_response(prompt, video_path=None):
 
@@ -769,7 +741,7 @@ def search_videos():
 
     if selected_model == 'gemini':
         try:
-            gemini_response = generate_gemini_response(query, video_path)
+            gemini_response = generate_gemini_response(query, video_path, "gemini-1.5-pro")
             responses["gemini"] = gemini_response
         except Exception as e:
             error_message = str(e)
@@ -781,6 +753,21 @@ def search_videos():
                 responses["gemini"] = f"Error generating Gemini response: {error_message}"
             
             errors["gemini"] = error_message
+    
+    elif selected_model == 'gemini-2.5':
+        try:
+            gemini_response = generate_gemini_response(query, video_path, "gemini-2.5-pro-preview-05-06")
+            responses["gemini-2.5"] = gemini_response
+        except Exception as e:
+            error_message = str(e)
+            print(f"Error in Gemini 2.5 response: {error_message}")
+            
+            if "exceeds the maximum token limit" in error_message.lower() or "too large" in error_message.lower():
+                responses["gemini-2.5"] = f"ERROR: The video is too large for Gemini 2.5 to process. Token limit exceeded.\n\nError details: {error_message}"
+            else:
+                responses["gemini-2.5"] = f"Error generating Gemini 2.5 response: {error_message}"
+            
+            errors["gemini-2.5"] = error_message
                 
     elif selected_model == 'gpt4o':
         try:
@@ -817,12 +804,12 @@ def search_videos():
         "errors": errors
     })
 
-
 @app.route('/api/models', methods=['GET'])
 def get_available_models():
     models = {
         "pegasus": bool(session.get('twelvelabs_api_key') or TWELVELABS_API_KEY),
         "gemini": bool(session.get('gemini_api_key') or GEMINI_API_KEY),
+        "gemini-2.5": bool(session.get('gemini_api_key') or GEMINI_API_KEY),  # Using same API key as regular Gemini
         "gpt4o": bool(session.get('openai_api_key') or OPENAI_API_KEY)
     }
     
@@ -830,6 +817,7 @@ def get_available_models():
         "status": "success", 
         "models": models
     })
+    
 
 def wake_up_app():
     try:
