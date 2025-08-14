@@ -91,25 +91,38 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if request.method == 'OPTIONS':
             response = make_response()
             return add_cors_headers(response)
-        # First try session API key, then fall back to environment API key
-        api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        
+        # Check if user has connected their own API key
+        user_api_key = session.get('twelvelabs_api_key')
+        env_api_key = Config.TWELVELABS_API_KEY
+        
+        # Priority: User's API key first, then environment API key
+        api_key = user_api_key or env_api_key
+        source = "user_session" if user_api_key else "environment"
+        
+        print(f"🔑 API Key Source: {source}")
+        print(f"🔑 Using API Key: {api_key[:10]}..." if api_key else "🔑 No API key available")
         
         if api_key:
             twelvelabs_service.update_api_key(api_key)
             indexes = twelvelabs_service.get_indexes()
             if indexes and len(indexes) > 0:
                 session['twelvelabs_indexes'] = indexes
+                print(f"📊 Found {len(indexes)} indexes from {source}")
                 return jsonify({
                     "status": "success", 
                     "indexes": indexes,
-                    "source": "session" if session.get('twelvelabs_api_key') else "environment"
+                    "source": source,
+                    "message": f"Using {source} API key - {len(indexes)} indexes found"
                 })
             else:
-                return jsonify({"status": "error", "message": "No indexes found"}), 404
+                print(f"❌ No indexes found with {source} API key")
+                return jsonify({"status": "error", "message": f"No indexes found with {source} API key"}), 404
         else:
+            print("❌ No API key available")
             return jsonify({
                 "status": "error", 
-                "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
+                "message": "No TwelveLabs API key available. Please connect your API key via /api/connect or set TWELVELABS_API_KEY in environment."
             }), 401
 
     @api.route('/indexes/<index_id>/videos', methods=['GET', 'OPTIONS'])
@@ -117,15 +130,23 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if request.method == 'OPTIONS':
             response = make_response()
             return add_cors_headers(response)
-        # First try session API key, then fall back to environment API key
-        api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        
+        # Check if user has connected their own API key
+        user_api_key = session.get('twelvelabs_api_key')
+        env_api_key = Config.TWELVELABS_API_KEY
+        
+        # Priority: User's API key first, then environment API key
+        api_key = user_api_key or env_api_key
+        source = "user_session" if user_api_key else "environment"
+        
+        print(f"🎬 Getting videos for index {index_id} using {source} API key")
         
         cache_key = f"videos_{index_id}"
         cache_expiry = session.get(f"{cache_key}_expiry")
         
         if cache_key in session and cache_expiry and datetime.now().timestamp() < cache_expiry:
-            print(f"Using cached videos for index {index_id}")
-            return jsonify({"status": "success", "videos": session[cache_key], "cached": True})
+            print(f"📦 Using cached videos for index {index_id}")
+            return jsonify({"status": "success", "videos": session[cache_key], "cached": True, "source": source})
         
         if api_key:
             twelvelabs_service.update_api_key(api_key)
@@ -133,17 +154,21 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             if videos and len(videos) > 0:
                 session[cache_key] = videos
                 session[f"{cache_key}_expiry"] = datetime.now().timestamp() + 300
+                print(f"📹 Found {len(videos)} videos in index {index_id} using {source} API key")
                 return jsonify({
                     "status": "success", 
                     "videos": videos,
-                    "source": "session" if session.get('twelvelabs_api_key') else "environment"
+                    "source": source,
+                    "message": f"Using {source} API key - {len(videos)} videos found"
                 })
             else:
-                return jsonify({"status": "error", "message": "No videos found in this index"}), 404
+                print(f"❌ No videos found in index {index_id} with {source} API key")
+                return jsonify({"status": "error", "message": f"No videos found in index {index_id} with {source} API key"}), 404
         else:
+            print("❌ No API key available for video access")
             return jsonify({
                 "status": "error", 
-                "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
+                "message": "No TwelveLabs API key available. Please connect your API key via /api/connect or set TWELVELABS_API_KEY in environment."
             }), 401
 
     @api.route('/video/select', methods=['POST', 'OPTIONS'])
