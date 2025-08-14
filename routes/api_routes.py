@@ -76,24 +76,31 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
 
     @api.route('/indexes', methods=['GET'])
     def get_indexes():
-        api_key = session.get('twelvelabs_api_key')
+        # First try session API key, then fall back to environment API key
+        api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         
         if api_key:
             twelvelabs_service.update_api_key(api_key)
             indexes = twelvelabs_service.get_indexes()
             if indexes and len(indexes) > 0:
                 session['twelvelabs_indexes'] = indexes
-                return jsonify({"status": "success", "indexes": indexes})
+                return jsonify({
+                    "status": "success", 
+                    "indexes": indexes,
+                    "source": "session" if session.get('twelvelabs_api_key') else "environment"
+                })
             else:
                 return jsonify({"status": "error", "message": "No indexes found"}), 404
         else:
-            return jsonify({"status": "success", "indexes": Config.PUBLIC_INDEXES, "public": True})
+            return jsonify({
+                "status": "error", 
+                "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
+            }), 401
 
     @api.route('/indexes/<index_id>/videos', methods=['GET'])
     def get_videos(index_id):
-        api_key = session.get('twelvelabs_api_key')
-        
-        public_index = next((index for index in Config.PUBLIC_INDEXES if index['id'] == index_id), None)
+        # First try session API key, then fall back to environment API key
+        api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         
         cache_key = f"videos_{index_id}"
         cache_expiry = session.get(f"{cache_key}_expiry")
@@ -108,24 +115,18 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             if videos and len(videos) > 0:
                 session[cache_key] = videos
                 session[f"{cache_key}_expiry"] = datetime.now().timestamp() + 300
-                return jsonify({"status": "success", "videos": videos})
+                return jsonify({
+                    "status": "success", 
+                    "videos": videos,
+                    "source": "session" if session.get('twelvelabs_api_key') else "environment"
+                })
             else:
                 return jsonify({"status": "error", "message": "No videos found in this index"}), 404
-        elif public_index:
-            if Config.TWELVELABS_API_KEY:
-                actual_index_id = public_index.get('index_id')
-                public_service = twelvelabs_service.__class__(Config.TWELVELABS_API_KEY)
-                videos = public_service.get_index_videos(actual_index_id)
-                if videos and len(videos) > 0:
-                    session[cache_key] = videos
-                    session[f"{cache_key}_expiry"] = datetime.now().timestamp() + 300
-                    return jsonify({"status": "success", "videos": videos, "public": True})
-                else:
-                    return jsonify({"status": "error", "message": "No videos found in this public index"}), 404
-            else:
-                return jsonify({"status": "error", "message": "TwelveLabs API key not configured in environment"}), 500
         else:
-            return jsonify({"status": "error", "message": "Invalid index ID or TwelveLabs API key required"}), 401
+            return jsonify({
+                "status": "error", 
+                "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
+            }), 401
 
     @api.route('/video/select', methods=['POST'])
     def select_video():
@@ -136,36 +137,32 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if not index_id or not video_id:
             return jsonify({"status": "error", "message": "Index ID and Video ID are required"}), 400
         
-        public_index = next((index for index in Config.PUBLIC_INDEXES if index['id'] == index_id), None)
+        # First try session API key, then fall back to environment API key
+        api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         
         session['selected_index_id'] = index_id
         session['selected_video_id'] = video_id
         
-        if public_index:
-            if Config.TWELVELABS_API_KEY:
-                actual_index_id = public_index.get('index_id')
-                session['actual_index_id'] = actual_index_id
-                
-                public_service = twelvelabs_service.__class__(Config.TWELVELABS_API_KEY)
-                result = video_service.select_video(index_id, video_id, public_service, True, actual_index_id)
-                
-                if result["success"]:
-                    session['video_path'] = result["video_path"]
-                    return jsonify({
-                        "status": "success",
-                        "message": result["message"],
-                        "video_id": video_id,
-                        "video_path": result["video_path"],
-                        "public": True
-                    })
-                else:
-                    return jsonify({"status": "error", "message": result["error"]}), 500
+        if api_key:
+            twelvelabs_service.update_api_key(api_key)
+            result = video_service.select_video(index_id, video_id, twelvelabs_service)
+            
+            if result["success"]:
+                session['video_path'] = result["video_path"]
+                return jsonify({
+                    "status": "success",
+                    "message": result["message"],
+                    "video_id": video_id,
+                    "video_path": result["video_path"],
+                    "source": "session" if session.get('twelvelabs_api_key') else "environment"
+                })
             else:
-                return jsonify({"status": "error", "message": "TwelveLabs API key not configured in environment"}), 500
-        
-        api_key = session.get('twelvelabs_api_key')
-        if not api_key:
-            return jsonify({"status": "error", "message": "TwelveLabs API key not found. Please connect your API key to access private videos."}), 401
+                return jsonify({"status": "error", "message": result["error"]}), 500
+        else:
+            return jsonify({
+                "status": "error", 
+                "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
+            }), 401
         
         twelvelabs_service.update_api_key(api_key)
         result = video_service.select_video(index_id, video_id, twelvelabs_service)

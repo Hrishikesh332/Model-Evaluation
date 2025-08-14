@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, jsonify
 import atexit
 import requests
 import os
@@ -63,24 +63,7 @@ def create_app():
     )
     app.register_blueprint(api_routes, url_prefix='/api')
 
-    @app.route('/')
-    def index():
-        return render_template('index.html')
 
-    @app.route('/performance-dashboard')
-    def performance_dashboard():
-        try:
-            all_stats = performance_monitor.get_all_model_stats()
-            recent_comparisons = performance_monitor.get_recent_comparisons(10)
-            comparison_summary = performance_monitor.get_model_comparison_summary()
-            
-            return render_template('performance_dashboard.html', 
-                                 model_stats=all_stats,
-                                 recent_comparisons=recent_comparisons,
-                                 comparison_summary=comparison_summary)
-        except Exception as e:
-            logger.error(f"Error loading performance dashboard: {e}")
-            return render_template('error.html', error=str(e))
 
     @app.route('/api/benchmark/run', methods=['POST'])
     def run_benchmark():
