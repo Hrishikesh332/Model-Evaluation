@@ -9,8 +9,6 @@ gunicorn
 werkzeug
 opencv-python
 apscheduler
-concurrent-futures>=3.1.1
-threading-extensions>=0.1.0
 numpy
 statistics
 structlog
