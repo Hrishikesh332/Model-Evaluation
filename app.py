@@ -1,4 +1,5 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 import atexit
 import requests
 import os
@@ -23,6 +24,46 @@ logger = logging.getLogger(__name__)
 def create_app():
 
     app = Flask(__name__)
+    
+    # Configure CORS for all portal integrations
+    CORS(app, 
+         resources={
+             r"/*": {
+                 "origins": [
+                     # Development origins
+                     "http://localhost:3000",
+                     "http://localhost:8080", 
+                     "http://localhost:3001",
+                     "http://localhost:5173",
+
+                     "*"
+                 ],
+                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+                 "allow_headers": [
+                     "Content-Type", 
+                     "Authorization", 
+                     "X-Requested-With",
+                     "X-API-Key",
+                     "Accept",
+                     "Origin",
+                     "Access-Control-Request-Method",
+                     "Access-Control-Request-Headers"
+                 ],
+                 "expose_headers": [
+                     "Content-Type",
+                     "X-Total-Count",
+                     "X-Page-Count"
+                 ],
+                 "supports_credentials": True,
+                 "max_age": 86400  # Cache preflight requests for 24 hours
+             }
+         },
+         # Global CORS settings
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+         expose_headers=["Content-Type", "X-Total-Count"],
+         supports_credentials=True
+    )
+    
     app.secret_key = Config.SECRET_KEY
     app.config['UPLOAD_FOLDER'] = Config.UPLOAD_FOLDER
     app.config['VIDEO_FOLDER'] = Config.VIDEO_FOLDER

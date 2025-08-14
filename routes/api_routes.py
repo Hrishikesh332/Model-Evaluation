@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, make_response
 from datetime import datetime
 from config import Config
 from performance import performance_monitor
@@ -6,6 +6,15 @@ from optimize import OptimizedVideoAnalyzer, CacheOptimizer
 import logging
 
 logger = logging.getLogger(__name__)
+
+def add_cors_headers(response):
+    """Add CORS headers to response"""
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-API-Key, Accept, Origin'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    response.headers['Access-Control-Max-Age'] = '86400'
+    return response
 
 def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_service, cache_manager):
     api = Blueprint('api', __name__)
@@ -22,8 +31,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
     )
     cache_optimizer = CacheOptimizer(cache_manager)
     
-    @api.route('/connect', methods=['POST'])
+    @api.route('/connect', methods=['POST', 'OPTIONS'])
     def connect_api():
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
         """Connect to various API services"""
         print("Connect API called")
         
@@ -74,8 +86,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         else:
             return jsonify({"status": "error", "message": "Invalid API type"}), 400
 
-    @api.route('/indexes', methods=['GET'])
+    @api.route('/indexes', methods=['GET', 'OPTIONS'])
     def get_indexes():
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
         # First try session API key, then fall back to environment API key
         api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         
@@ -97,8 +112,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
             }), 401
 
-    @api.route('/indexes/<index_id>/videos', methods=['GET'])
+    @api.route('/indexes/<index_id>/videos', methods=['GET', 'OPTIONS'])
     def get_videos(index_id):
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
         # First try session API key, then fall back to environment API key
         api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         
@@ -128,8 +146,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
             }), 401
 
-    @api.route('/video/select', methods=['POST'])
+    @api.route('/video/select', methods=['POST', 'OPTIONS'])
     def select_video():
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
         """Select a video for processing"""
         index_id = request.json.get('index_id')
         video_id = request.json.get('video_id')
@@ -190,8 +211,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         
         return jsonify({"status": "success", "models": models})
 
-    @api.route('/search', methods=['POST'])
+    @api.route('/search', methods=['POST', 'OPTIONS'])
     def search_videos():
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
         """Enhanced search with performance monitoring and parallel processing"""
         print("Enhanced search endpoint called")
         query = request.json.get('query')
