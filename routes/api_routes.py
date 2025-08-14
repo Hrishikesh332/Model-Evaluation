@@ -48,19 +48,52 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         print(f"Connecting {api_type} API with key: {api_key[:5]}...")
         
         if api_type == 'twelvelabs':
+            # Clear all cached data when connecting new API key
+            print("🧹 Clearing cached data for new API key...")
+            
+            # Clear old indexes
+            if 'twelvelabs_indexes' in session:
+                session.pop('twelvelabs_indexes', None)
+                print("   ✅ Cleared cached indexes")
+            
+            # Clear all cached videos
+            keys_to_remove = []
+            for key in session.keys():
+                if key.startswith('videos_') or key.endswith('_expiry'):
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                session.pop(key, None)
+                print(f"   ✅ Cleared cached data: {key}")
+            
+            # Clear selected video state
+            session.pop('selected_index_id', None)
+            session.pop('selected_video_id', None)
+            session.pop('video_path', None)
+            print("   ✅ Cleared selected video state")
+            
+            # Store new API key
             session['twelvelabs_api_key'] = api_key
             twelvelabs_service.update_api_key(api_key)
+            
             try:
+                # Fetch fresh indexes with new API key
+                print(f"🔄 Fetching fresh indexes with new API key...")
                 indexes = twelvelabs_service.get_indexes()
+                
                 if indexes and len(indexes) > 0:
                     session['twelvelabs_indexes'] = indexes
+                    print(f"📊 Found {len(indexes)} fresh indexes with new API key")
                     return jsonify({
                         "status": "success", 
-                        "message": "TwelveLabs API key connected successfully", 
-                        "indexes": indexes
+                        "message": "TwelveLabs API key connected successfully - All cached data cleared and refreshed", 
+                        "indexes": indexes,
+                        "cached_cleared": True,
+                        "indexes_count": len(indexes)
                     })
                 else:
-                    return jsonify({"status": "error", "message": "Connected but no indexes found"}), 404
+                    print("❌ No indexes found with new API key")
+                    return jsonify({"status": "error", "message": "Connected but no indexes found with this API key"}), 404
             except Exception as e:
                 print(f"Exception in connect_api: {str(e)}")
                 return jsonify({"status": "error", "message": f"Failed to connect: {str(e)}"}), 400
@@ -522,18 +555,85 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         try:
             cache_manager.clear_cache()
             
-            for key in list(session.keys()):
+            # Clear all session-based caches
+            keys_to_remove = []
+            for key in session.keys():
                 if key.startswith('videos_') or key.endswith('_expiry'):
-                    session.pop(key, None)
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                session.pop(key, None)
+            
+            # Clear indexes cache
+            session.pop('twelvelabs_indexes', None)
+            
+            # Clear selected video state
+            session.pop('selected_index_id', None)
+            session.pop('selected_video_id', None)
+            session.pop('video_path', None)
             
             return jsonify({
                 "status": "success",
-                "message": "All caches cleared successfully"
+                "message": "All caches cleared successfully - indexes, videos, and video state reset"
             })
         except Exception as e:
             return jsonify({
                 "status": "error",
                 "message": f"Error clearing cache: {str(e)}"
+            }), 500
+
+    @api.route('/refresh-data', methods=['POST'])
+    def refresh_data():
+        """Force refresh all data with current API key"""
+        try:
+            api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+            
+            if not api_key:
+                return jsonify({
+                    "status": "error",
+                    "message": "No API key available for refresh"
+                }), 401
+            
+            # Clear all cached data
+            keys_to_remove = []
+            for key in session.keys():
+                if key.startswith('videos_') or key.endswith('_expiry'):
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                session.pop(key, None)
+            
+            # Clear indexes cache
+            session.pop('twelvelabs_indexes', None)
+            
+            # Clear selected video state
+            session.pop('selected_index_id', None)
+            session.pop('selected_video_id', None)
+            session.pop('video_path', None)
+            
+            # Fetch fresh indexes
+            twelvelabs_service.update_api_key(api_key)
+            indexes = twelvelabs_service.get_indexes()
+            
+            if indexes and len(indexes) > 0:
+                session['twelvelabs_indexes'] = indexes
+                return jsonify({
+                    "status": "success",
+                    "message": "Data refreshed successfully",
+                    "indexes": indexes,
+                    "indexes_count": len(indexes),
+                    "source": "user_session" if session.get('twelvelabs_api_key') else "environment"
+                })
+            else:
+                return jsonify({
+                    "status": "error",
+                    "message": "No indexes found after refresh"
+                }), 404
+                
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"Error refreshing data: {str(e)}"
             }), 500
 
     @api.route('/video/status', methods=['GET'])
