@@ -109,7 +109,7 @@ class CacheManager:
 
         model_suffix = {
             "gemini": "gemini-1.5-pro",
-            "gemini-2.5": "gemini-2.5-pro-exp-03-25",
+            "gemini-2.0-flash": "gemini-2.0-flash",
             "gpt4o": "gpt4o"
         }.get(model, "gemini-1.5-pro")
         

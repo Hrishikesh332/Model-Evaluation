@@ -79,7 +79,7 @@ def create_app():
 
     models_dict = {
         'gemini': gemini_model,
-        'gemini-2.5': gemini_model, 
+        'gemini-2.0-flash': gemini_model, 
         'gpt4o': openai_model,
         'pegasus': twelvelabs_service
     }

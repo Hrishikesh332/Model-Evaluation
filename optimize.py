@@ -319,7 +319,7 @@ class CacheOptimizer:
             try:
                 if hasattr(self.cache_manager, 'extract_and_cache_frames'):
 
-                    model_suffixes = ['gemini-1.5-pro', 'gemini-2.5-pro-exp-03-25', 'gpt4o']
+                    model_suffixes = ['gemini-1.5-pro', 'gemini-2.0-flash', 'gpt4o']
                     for suffix in model_suffixes:
                         cache_key = f"{video_id}_{suffix}"
                         self.cache_manager.extract_and_cache_frames(

@@ -21,7 +21,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
     
     models_dict = {
         'gemini': gemini_model,
-        'gemini-2.5': gemini_model,
+        'gemini-2.0-flash': gemini_model,
         'gpt4o': openai_model,
         'pegasus': twelvelabs_service
     }
@@ -263,7 +263,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         models = {
             "pegasus": bool(session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY),
             "gemini": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
-            "gemini-2.5": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
+            "gemini-2.0-flash": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
             "gpt4o": bool(session.get('openai_api_key') or Config.OPENAI_API_KEY)
         }
         
@@ -485,9 +485,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 if model_name == 'gemini':
                     response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
                     responses["gemini"] = response
-                elif model_name == 'gemini-2.5':
-                    response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro-exp-03-25", cache_manager)
-                    responses["gemini-2.5"] = response
+                elif model_name == 'gemini-2.0-flash':
+                    response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                    responses["gemini-2.0-flash"] = response
                 elif model_name == 'gpt4o':
                     response = openai_model.generate_response(query, video_path, cache_manager)
                     responses["gpt4o"] = response
@@ -529,9 +529,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             if selected_model == 'gemini':
                 response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
                 responses["gemini"] = response
-            elif selected_model == 'gemini-2.5':
-                response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro-exp-03-25", cache_manager)
-                responses["gemini-2.5"] = response
+            elif selected_model == 'gemini-2.0-flash':
+                response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                responses["gemini-2.0-flash"] = response
             elif selected_model == 'gpt4o':
                 response = openai_model.generate_response(query, video_path, cache_manager)
                 responses["gpt4o"] = response

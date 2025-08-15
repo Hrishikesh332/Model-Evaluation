@@ -1,16 +1,14 @@
 import requests
-from twelvelabs import TwelveLabs
+import json
 from config import Config
 
 class TwelveLabsService:
     def __init__(self, api_key=None):
         self.api_key = api_key or Config.TWELVELABS_API_KEY
-        self.client = TwelveLabs(api_key=self.api_key) if self.api_key else None
+        # Remove dependency on old client format - use direct API calls
     
     def update_api_key(self, api_key):
-
         self.api_key = api_key
-        self.client = TwelveLabs(api_key=api_key) if api_key else None
     
 
     # Get all indexes from TwelveLabs
@@ -182,8 +180,8 @@ class TwelveLabsService:
     # Generate response using Pegasus model
     def generate_response(self, video_id, prompt, index_id=None):
         try:
-            if not self.client:
-                return "TwelveLabs client not initialized. Please check your API key."
+            if not self.api_key:
+                return "TwelveLabs API key not available. Please check your API key."
                 
             print(f"Generating Pegasus response with video_id: {video_id}, prompt: {prompt}")
             
@@ -198,42 +196,101 @@ class TwelveLabsService:
             Focus on providing an informative and comprehensive analysis.
             """
             
-            try:
-                text_stream = self.client.generate.text_stream(
-                    video_id=video_id,
-                    prompt=enhanced_prompt
-                )
+            # Use direct API call with current TwelveLabs API format
+            headers = {
+                "accept": "application/json",
+                "x-api-key": self.api_key,
+                "Content-Type": "application/json"
+            }
+            
+            # Current TwelveLabs API endpoint for text generation
+            url = "https://api.twelvelabs.io/v1.3/generate"
+            payload = {
+                "video_id": video_id,
+                "prompt": enhanced_prompt
+                # Remove invalid parameters - TwelveLabs API doesn't support max_tokens or temperature
+            }
+            
+            print(f"Making direct API call to TwelveLabs generate endpoint: {url}")
+            print(f"Payload: {payload}")
+            
+            response = requests.post(url, json=payload, headers=headers)
+            print(f"API Response Status: {response.status_code}")
+            print(f"API Response Headers: {dict(response.headers)}")
+            
+            if response.status_code == 200:
+                print(f"Raw response text: {response.text}")
                 
-                response_text = ""
-                for text in text_stream:
-                    response_text = text_stream.aggregated_text
+                # Handle streaming response format (multiple JSON lines)
+                if '\n' in response.text:
+                    print("Detected streaming response format")
+                    lines = response.text.strip().split('\n')
+                    full_text = ""
+                    
+                    for line in lines:
+                        line = line.strip()
+                        if line:
+                            try:
+                                line_data = json.loads(line)
+                                if line_data.get('event_type') == 'text_generation':
+                                    text_chunk = line_data.get('text', '')
+                                    full_text += text_chunk
+                                    print(f"Text chunk: {text_chunk}")
+                                elif line_data.get('event_type') == 'stream_end':
+                                    print(f"Stream ended: {line_data}")
+                            except json.JSONDecodeError:
+                                print(f"Failed to parse line: {line}")
+                    
+                    if full_text:
+                        print(f"Full assembled text: {full_text}")
+                        return full_text
+                    else:
+                        return "No text content found in streaming response"
                 
-                return response_text
-                
-            except AttributeError:
-                headers = {
-                    "accept": "application/json",
-                    "x-api-key": self.api_key,
-                    "Content-Type": "application/json"
-                }
-                url = "https://api.twelvelabs.io/v1.3/generate"
-                payload = {
-                    "video_id": video_id,
-                    "prompt": enhanced_prompt
-                }
-                
-                print("Making direct API call to TwelveLabs generate endpoint")
-                response = requests.post(url, json=payload, headers=headers)
-                
-                if response.status_code == 200:
+                # Handle single JSON response
+                try:
                     result = response.json()
+                    print(f"API Response Body: {result}")
+                    
+                    # Handle different response formats
                     if 'text' in result:
                         return result['text']
+                    elif 'data' in result and 'text' in result['data']:
+                        return result['data']['text']
+                    elif 'response' in result and 'text' in result['response']:
+                        return result['response']['text']
+                    elif 'content' in result:
+                        return result['content']
                     else:
-                        return "The API response didn't contain the expected text content."
-                else:
-                    print(f"TwelveLabs API Error: {response.status_code} - {response.text}")
-                    return f"API Error: {response.status_code} - {response.text}"
+                        print(f"Unexpected response format: {result}")
+                        return f"Response received but format unexpected: {str(result)[:200]}..."
+                        
+                except Exception as json_error:
+                    print(f"JSON parsing error: {json_error}")
+                    print(f"Raw response text: {response.text}")
+                    
+                    # Try to extract text from raw response
+                    raw_text = response.text.strip()
+                    if raw_text:
+                        # Look for common patterns in the response
+                        if '"text":' in raw_text:
+                            # Try to extract text field manually
+                            try:
+                                import re
+                                text_match = re.search(r'"text":\s*"([^"]*)"', raw_text)
+                                if text_match:
+                                    return text_match.group(1)
+                            except:
+                                pass
+                        
+                        # Return first 500 characters of raw response as fallback
+                        return f"Raw response (first 500 chars): {raw_text[:500]}"
+                    else:
+                        return "Empty response received from API"
+            else:
+                print(f"TwelveLabs API Error: {response.status_code}")
+                print(f"Error Response: {response.text}")
+                return f"API Error {response.status_code}: {response.text}"
                     
         except Exception as e:
             print(f"Exception generating Pegasus response: {str(e)}")

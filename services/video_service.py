@@ -77,7 +77,7 @@ class VideoService:
             }
         
         gemini_cache_key = f"{video_id}_gemini-1.5-pro"
-        gemini25_cache_key = f"{video_id}_gemini-2.5-pro-exp-03-25"
+        gemini20flash_cache_key = f"{video_id}_gemini-2.0-flash"
         gpt4o_cache_key = f"{video_id}_gpt4o"
         
         cache_status = {
@@ -86,7 +86,7 @@ class VideoService:
             "file_size_mb": round(os.path.getsize(video_path) / (1024 * 1024), 2) if os.path.exists(video_path) else 0,
             "cached_frames": {
                 "gemini": gemini_cache_key in self.cache_manager.video_frames_cache,
-                "gemini-2.5": gemini25_cache_key in self.cache_manager.video_frames_cache,
+                "gemini-2.0-flash": gemini20flash_cache_key in self.cache_manager.video_frames_cache,
                 "gpt4o": gpt4o_cache_key in self.cache_manager.video_frames_cache
             }
         }
@@ -113,7 +113,7 @@ class VideoService:
             
             threading.Thread(
                 target=self.cache_manager.extract_and_cache_frames,
-                args=(video_path, 10, f"{video_id}_gemini-2.5-pro-exp-03-25")
+                args=(video_path, 10, f"{video_id}_gemini-2.0-flash")
             ).start()
             
             threading.Thread(
