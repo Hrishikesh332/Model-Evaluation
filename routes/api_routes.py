@@ -269,13 +269,13 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         
         return jsonify({"status": "success", "models": models})
 
-    @api.route('/search', methods=['POST', 'OPTIONS'])
-    def search_videos():
+    @api.route('/analyze', methods=['POST', 'OPTIONS'])
+    def analyze_videos():
         if request.method == 'OPTIONS':
             response = make_response()
             return add_cors_headers(response)
-        """Enhanced search with performance monitoring and parallel processing"""
-        print("Enhanced search endpoint called")
+        """Enhanced video analysis with performance monitoring and parallel processing"""
+        print("Enhanced analyze endpoint called")
         query = request.json.get('query')
         selected_model = request.json.get('model', 'gemini')
         execution_mode = request.json.get('execution_mode', 'parallel') 
@@ -357,7 +357,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 })
                 
         except Exception as e:
-            logger.error(f"Error in enhanced search: {e}")
+            logger.error(f"Error in enhanced analyze: {e}")
             return jsonify({
                 "status": "error",
                 "message": f"Error during analysis: {str(e)}"
