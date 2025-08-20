@@ -15,6 +15,7 @@ class ModelTask:
     model_instance: Any
     prompt: str
     video_path: Optional[str] = None
+    video_id: Optional[str] = None
     cache_manager: Optional[Any] = None
     additional_params: Dict = None
 
@@ -69,7 +70,7 @@ class ModelExecutor:
             error_message=error_message,
             response_length=response_length,
             cache_hit=cache_hit,
-            video_id=task.video_path.split('/')[-1].split('.')[0] if task.video_path else None,
+            video_id=task.video_id if hasattr(task, 'video_id') and task.video_id else (task.video_path.split('/')[-1].split('.')[0] if task.video_path else None),
             query=task.prompt
         )
         
@@ -198,6 +199,7 @@ class OptimizedVideoAnalyzer:
     
     def analyze_video_parallel(self, query: str, selected_models: List[str], 
                              video_path: Optional[str] = None, 
+                             video_id: Optional[str] = None,
                              timeout: float = 300.0) -> Tuple[Dict[str, str], ComparisonResult]:
         
         tasks = []
@@ -208,6 +210,7 @@ class OptimizedVideoAnalyzer:
                     model_instance=self.models[model_name],
                     prompt=query,
                     video_path=video_path,
+                    video_id=video_id,
                     cache_manager=self.cache_manager
                 )
                 tasks.append(task)
@@ -261,6 +264,7 @@ class OptimizedVideoAnalyzer:
         return responses, comparison_result
     
     def run_model_comparison(self, query: str, video_path: Optional[str] = None, 
+                           video_id: Optional[str] = None,
                            include_models: List[str] = None) -> Dict:
         
         if include_models is None:
@@ -274,7 +278,7 @@ class OptimizedVideoAnalyzer:
         logger.info(f"Running comparison with models: {available_models}")
         
         parallel_responses, parallel_result = self.analyze_video_parallel(
-            query, available_models, video_path
+            query, available_models, video_path, video_id
         )
         
         sequential_responses, sequential_result = self.analyze_video_sequential(

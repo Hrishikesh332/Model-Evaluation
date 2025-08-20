@@ -284,15 +284,16 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if not query:
             return jsonify({"status": "error", "message": "No query provided"}), 400
         
-        index_id = session.get('selected_index_id')
-        video_id = session.get('selected_video_id')
-        video_path = session.get('video_path')
+        # Get video info from request body first, then fall back to session
+        index_id = request.json.get('index_id') or session.get('selected_index_id')
+        video_id = request.json.get('video_id') or session.get('selected_video_id')
+        video_path = request.json.get('video_path') or session.get('video_path')
         
         print(f"Processing query: '{query}' for video_id: {video_id} with model: {selected_model}")
         print(f"Execution mode: {execution_mode}, Compare models: {compare_models}")
         
         if not index_id or not video_id:
-            return jsonify({"status": "error", "message": "No video selected. Please select a video first."}), 400
+            return jsonify({"status": "error", "message": "No video selected. Please provide index_id and video_id in request body or select a video first."}), 400
         
         api_key = session.get('gemini_api_key', Config.GEMINI_API_KEY)
         if api_key:
@@ -313,7 +314,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         try:
             if compare_models:
                 comparison_result = optimized_analyzer.run_model_comparison(
-                    query, video_path, [selected_model, 'pegasus']
+                    query, video_path, video_id, [selected_model, 'pegasus']
                 )
                 
                 return jsonify({
@@ -328,7 +329,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                     selected_models.append('pegasus') 
                 
                 parallel_responses, comparison_result = optimized_analyzer.analyze_video_parallel(
-                    query, selected_models, video_path
+                    query, selected_models, video_path, video_id
                 )
                 
                 actual_responses = await_get_actual_responses(query, selected_models, video_path, 

@@ -130,9 +130,14 @@ Analyze video with AI models.
   "query": "What is happening in this video?",
   "model": "gemini",
   "execution_mode": "parallel|sequential",
-  "compare_models": false
+  "compare_models": false,
+  "index_id": "your_index_id",
+  "video_id": "your_video_id",
+  "video_path": "optional_video_path"
 }
 ```
+
+**Note:** `index_id` and `video_id` are required. If not provided in request body, the endpoint will fall back to session data.
 
 **Response:**
 ```json

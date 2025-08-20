@@ -290,7 +290,9 @@ curl -X POST "$API_BASE/search" \
   -d '{
     "query": "What is happening in this video?",
     "model": "gemini",
-    "execution_mode": "sequential"
+    "execution_mode": "sequential",
+    "index_id": "your_index_id",
+    "video_id": "your_video_id"
   }'
 ```
 
@@ -322,7 +324,9 @@ curl -X POST "$API_BASE/search" \
   -d '{
     "query": "Describe the main actions in this video",
     "model": "gemini",
-    "execution_mode": "parallel"
+    "execution_mode": "parallel",
+    "index_id": "your_index_id",
+    "video_id": "your_video_id"
   }'
 ```
 
@@ -360,7 +364,9 @@ curl -X POST "$API_BASE/search" \
   -d '{
     "query": "What are the key visual elements?",
     "model": "gemini",
-    "compare_models": true
+    "compare_models": true,
+    "index_id": "your_index_id",
+    "video_id": "your_video_id"
   }'
 ```
 
@@ -891,7 +897,7 @@ curl -s -X POST "$API_BASE/video/select" \
 echo "6. Analyzing the video..."
 curl -s -X POST "$API_BASE/search" \
   -H "Content-Type: application/json" \
-  -d '{"query": "What is happening in this video?", "model": "gemini"}' | jq '.'
+  -d '{"query": "What is happening in this video?", "model": "gemini", "index_id": "'$INDEX_ID'", "video_id": "'$VIDEO_ID'"}' | jq '.'
 
 # 7. Check performance stats
 echo "7. Checking performance stats..."

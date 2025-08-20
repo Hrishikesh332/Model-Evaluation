@@ -11,3 +11,13 @@ __pycache__/
 *.pyd
 
 videos/
+
+# SSH Keys
+*.pem
+*.key
+*.pub
+id_rsa*
+id_ed25519*
+id_ecdsa*
+ssh_host_*
+ssh_known_hosts
