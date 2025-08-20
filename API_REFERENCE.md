@@ -9,7 +9,7 @@
 | GET | `/indexes/{id}/videos` | Get videos in index | No |
 | POST | `/video/select` | Select video for processing | No |
 | GET | `/models` | Get available models | No |
-| POST | `/search` | Analyze video | No |
+| POST | `/analyze` | Analyze video | No |
 | GET | `/performance/stats` | Get performance stats | No |
 | GET | `/performance/recent-comparisons` | Get recent comparisons | No |
 | GET | `/performance/export` | Export performance data | No |
@@ -18,6 +18,7 @@
 | POST | `/optimize/preload` | Preload videos | No |
 | POST | `/clear-cache` | Clear all cache | No |
 | GET | `/video/status` | Get video status | No |
+| GET | `/video/current` | Get current video selection | No |
 | POST | `/preload-frames` | Preload video frames | No |
 | GET | `/cache/stats` | Get cache statistics | No |
 | POST | `/load-cached-frames` | Load cached frames | No |
@@ -103,6 +104,28 @@ Select video for processing.
 }
 ```
 
+#### GET `/video/current`
+Get current video selection for frontend reference.
+
+**Response:**
+```json
+{
+  "status": "success",
+  "current_video": {
+    "index_id": "index_id",
+    "video_id": "video_id",
+    "video_path": "/path/to/video",
+    "last_known": {
+      "index_id": "index_id",
+      "video_id": "video_id",
+      "timestamp": "2024-01-01T12:00:00Z"
+    },
+    "has_selection": true
+  },
+  "message": "Current video selection retrieved successfully"
+}
+```
+
 ### Model Analysis
 
 #### GET `/models`
@@ -121,7 +144,7 @@ Get available AI models.
 }
 ```
 
-#### POST `/search`
+#### POST `/analyze`
 Analyze video with AI models.
 
 **Request:**
@@ -137,7 +160,25 @@ Analyze video with AI models.
 }
 ```
 
-**Note:** `index_id` and `video_id` are required. If not provided in request body, the endpoint will fall back to session data.
+**Note:** `index_id` and `video_id` are required. If not provided in request body, the endpoint will fall back to session data or last known video.
+
+**Error Response (when video info missing):**
+```json
+{
+  "status": "error",
+  "message": "No video selected. Please provide index_id and video_id in request body or select a video first.",
+  "help": {
+    "required_fields": ["index_id", "video_id"],
+    "example_request": {
+      "query": "What is happening in this video?",
+      "model": "gpt4o",
+      "index_id": "your_index_id_here",
+      "video_id": "your_video_id_here"
+    },
+    "frontend_fix": "Update your frontend to include index_id and video_id in the request body"
+  }
+}
+```
 
 **Response:**
 ```json

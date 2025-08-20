@@ -222,6 +222,13 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         session['selected_index_id'] = index_id
         session['selected_video_id'] = video_id
         
+        # Store last known video for fallback
+        session['last_known_video'] = {
+            'index_id': index_id,
+            'video_id': video_id,
+            'timestamp': datetime.now().isoformat()
+        }
+        
         if api_key:
             twelvelabs_service.update_api_key(api_key)
             result = video_service.select_video(index_id, video_id, twelvelabs_service)
@@ -289,11 +296,42 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         video_id = request.json.get('video_id') or session.get('selected_video_id')
         video_path = request.json.get('video_path') or session.get('video_path')
         
+        print(f"Request JSON: {request.json}")
+        print(f"Session data - index_id: {session.get('selected_index_id')}, video_id: {session.get('selected_video_id')}")
         print(f"Processing query: '{query}' for video_id: {video_id} with model: {selected_model}")
         print(f"Execution mode: {execution_mode}, Compare models: {compare_models}")
         
         if not index_id or not video_id:
-            return jsonify({"status": "error", "message": "No video selected. Please provide index_id and video_id in request body or select a video first."}), 400
+            # Try to get the last known video from session as fallback
+            last_known_video = session.get('last_known_video', {})
+            fallback_index_id = last_known_video.get('index_id')
+            fallback_video_id = last_known_video.get('video_id')
+            
+            if fallback_index_id and fallback_video_id:
+                print(f"🔄 Using fallback video: {fallback_index_id}/{fallback_video_id}")
+                index_id = fallback_index_id
+                video_id = fallback_video_id
+            else:
+                return jsonify({
+                    "status": "error", 
+                    "message": "No video selected. Please provide index_id and video_id in request body or select a video first.",
+                    "help": {
+                        "required_fields": ["index_id", "video_id"],
+                        "example_request": {
+                            "query": "What is happening in this video?",
+                            "model": "gpt4o",
+                            "index_id": "your_index_id_here",
+                            "video_id": "your_video_id_here"
+                        },
+                        "frontend_fix": "Update your frontend to include index_id and video_id in the request body"
+                    },
+                    "debug_info": {
+                        "request_body": request.json,
+                        "session_index_id": session.get('selected_index_id'),
+                        "session_video_id": session.get('selected_video_id'),
+                        "fallback_available": bool(fallback_index_id and fallback_video_id)
+                    }
+                }), 400
         
         api_key = session.get('gemini_api_key', Config.GEMINI_API_KEY)
         if api_key:
@@ -636,6 +674,23 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 "status": "error",
                 "message": f"Error refreshing data: {str(e)}"
             }), 500
+
+    @api.route('/video/current', methods=['GET'])
+    def get_current_video():
+        """Get current video selection for frontend reference"""
+        current_video = {
+            "index_id": session.get('selected_index_id'),
+            "video_id": session.get('selected_video_id'),
+            "video_path": session.get('video_path'),
+            "last_known": session.get('last_known_video', {}),
+            "has_selection": bool(session.get('selected_index_id') and session.get('selected_video_id'))
+        }
+        
+        return jsonify({
+            "status": "success",
+            "current_video": current_video,
+            "message": "Current video selection retrieved successfully"
+        })
 
     @api.route('/video/status', methods=['GET'])
     def get_video_status():
