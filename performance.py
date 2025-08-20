@@ -16,6 +16,7 @@ class ModelPerformance:
     latency: float
     success: bool
     error_message: Optional[str] = None
+    response: Optional[str] = None
     response_length: int = 0
     cache_hit: bool = False
     video_id: Optional[str] = None
@@ -29,6 +30,7 @@ class ModelPerformance:
             'latency': self.latency,
             'success': self.success,
             'error_message': self.error_message,
+            'response': self.response,
             'response_length': self.response_length,
             'cache_hit': self.cache_hit,
             'video_id': self.video_id,
@@ -121,6 +123,7 @@ class PerformanceMonitor:
                     latency=latency,
                     success=success,
                     error_message=error_message,
+                    response=response,
                     response_length=response_length
                 )
                 
@@ -228,6 +231,7 @@ class BenchmarkSuite:
                             end_time=model_end,
                             latency=model_end - model_start,
                             success=True,
+                            response=response,
                             response_length=len(response) if isinstance(response, str) else 0,
                             query=prompt
                         )

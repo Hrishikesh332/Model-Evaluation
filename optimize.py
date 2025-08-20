@@ -38,14 +38,32 @@ class ModelExecutor:
         
         try:
             if hasattr(self.model_instance, 'generate_response'):
-                if task.cache_manager and 'cache_manager' in self.model_instance.generate_response.__code__.co_varnames:
-                    response = self.model_instance.generate_response(
-                        task.prompt, 
-                        task.video_path, 
-                        cache_manager=task.cache_manager
-                    )
+                # Handle different model types with their specific parameter requirements
+                if self.model_name == 'pegasus':
+                    # TwelveLabs service expects: generate_response(video_id, prompt, index_id)
+                    # We need to get the actual video_id from the task
+                    actual_video_id = task.video_id if task.video_id else None
+                    if not actual_video_id and task.video_path:
+                        # Extract video_id from video_path if available
+                        actual_video_id = task.video_path.split('/')[-1].split('.')[0]
+                    
+                    if actual_video_id:
+                        response = self.model_instance.generate_response(
+                            video_id=actual_video_id,
+                            prompt=task.prompt
+                        )
+                    else:
+                        raise ValueError("No video_id available for Pegasus model")
                 else:
-                    response = self.model_instance.generate_response(task.prompt, task.video_path)
+                    # Other models (Gemini, OpenAI) expect: generate_response(prompt, video_path, ...)
+                    if task.cache_manager and 'cache_manager' in self.model_instance.generate_response.__code__.co_varnames:
+                        response = self.model_instance.generate_response(
+                            task.prompt, 
+                            task.video_path, 
+                            cache_manager=task.cache_manager
+                        )
+                    else:
+                        response = self.model_instance.generate_response(task.prompt, task.video_path)
             else:
                 raise AttributeError(f"Model {self.model_name} does not have generate_response method")
             
@@ -68,6 +86,7 @@ class ModelExecutor:
             latency=latency,
             success=success,
             error_message=error_message,
+            response=response,
             response_length=response_length,
             cache_hit=cache_hit,
             video_id=task.video_id if hasattr(task, 'video_id') and task.video_id else (task.video_path.split('/')[-1].split('.')[0] if task.video_path else None),
@@ -223,8 +242,11 @@ class OptimizedVideoAnalyzer:
         responses = {}
         for performance in comparison_result.performances:
             if performance.success:
-
-                responses[performance.model_name] = f"Model executed successfully in {performance.latency:.2f}s"
+                # Get the actual response from the performance object
+                if hasattr(performance, 'response') and performance.response:
+                    responses[performance.model_name] = performance.response
+                else:
+                    responses[performance.model_name] = f"Model executed successfully in {performance.latency:.2f}s"
             else:
                 responses[performance.model_name] = f"Error: {performance.error_message}"
         
@@ -233,7 +255,8 @@ class OptimizedVideoAnalyzer:
         return responses, comparison_result
     
     def analyze_video_sequential(self, query: str, selected_models: List[str], 
-                               video_path: Optional[str] = None) -> Tuple[Dict[str, str], ComparisonResult]:
+                               video_path: Optional[str] = None,
+                               video_id: Optional[str] = None) -> Tuple[Dict[str, str], ComparisonResult]:
 
         tasks = []
         for model_name in selected_models:
@@ -243,6 +266,7 @@ class OptimizedVideoAnalyzer:
                     model_instance=self.models[model_name],
                     prompt=query,
                     video_path=video_path,
+                    video_id=video_id,
                     cache_manager=self.cache_manager
                 )
                 tasks.append(task)
@@ -255,7 +279,11 @@ class OptimizedVideoAnalyzer:
         responses = {}
         for performance in comparison_result.performances:
             if performance.success:
-                responses[performance.model_name] = f"Model executed successfully in {performance.latency:.2f}s"
+                # Get the actual response from the performance object
+                if hasattr(performance, 'response') and performance.response:
+                    responses[performance.model_name] = performance.response
+                else:
+                    responses[performance.model_name] = f"Model executed successfully in {performance.latency:.2f}s"
             else:
                 responses[performance.model_name] = f"Error: {performance.error_message}"
         
@@ -282,7 +310,7 @@ class OptimizedVideoAnalyzer:
         )
         
         sequential_responses, sequential_result = self.analyze_video_sequential(
-            query, available_models, video_path
+            query, available_models, video_path, video_id
         )
         
         parallel_stats = parallel_result.calculate_stats()
