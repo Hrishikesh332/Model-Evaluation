@@ -498,11 +498,8 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         from flask import Response, stream_with_context
         import json
         import time
-        import asyncio
-        import threading
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        from queue import Queue
-        import uuid
+        from concurrent.futures import ThreadPoolExecutor
+        from queue import Queue, Empty
         
         query = request.json.get('query')
         models_to_run = request.json.get('models', ['gemini', 'pegasus'])  # Can specify multiple models
@@ -516,6 +513,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         def generate_parallel_stream():
             """Generate parallel streaming response"""
             try:
+                print(f"🚀 Starting parallel analysis with models: {models_to_run}")
                 # Send initial status
                 yield f"data: {json.dumps({'event_type': 'start', 'message': 'Parallel analysis started', 'models': models_to_run})}\n\n"
                 
@@ -527,16 +525,21 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 def process_model_response(model_name, response_text):
                     """Process individual model response and add to queue"""
                     try:
+                        # Send response in chunks for better streaming
                         words = response_text.split()
-                        for word in words:
+                        chunk_size = max(1, len(words) // 20)  # Send ~20 chunks instead of word-by-word
+                        
+                        for i in range(0, len(words), chunk_size):
+                            chunk = ' '.join(words[i:i + chunk_size]) + ' '
                             event = {
                                 'event_type': 'text_generation',
-                                'text': word + ' ',
+                                'text': chunk,
                                 'model': model_name,
                                 'timestamp': time.time()
                             }
                             response_queue.put(event)
-                            time.sleep(0.02)  # Faster streaming for parallel
+                            time.sleep(0.05)  # Small delay between chunks
+                            
                     except Exception as e:
                         error_event = {
                             'event_type': 'error',
@@ -549,6 +552,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 def run_model_analysis(model_name):
                     """Run analysis for a specific model"""
                     try:
+                        print(f"🔄 Starting {model_name} analysis...")
                         # Send model start event
                         start_event = {
                             'event_type': 'model_start',
@@ -558,6 +562,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                         response_queue.put(start_event)
                         
                         # Run the actual analysis
+                        print(f"⚡ Running {model_name} analysis...")
                         if model_name == 'gemini':
                             response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
                         elif model_name == 'pegasus':
@@ -567,6 +572,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                         else:
                             response = f"Unknown model: {model_name}"
                         
+                        print(f"✅ {model_name} completed with {len(response)} characters")
                         # Process the response
                         process_model_response(model_name, response)
                         
@@ -600,23 +606,27 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                     
                     # Stream responses as they come in
                     completed_models = set()
+                    print(f"📡 Starting to stream responses from {len(active_models)} active models...")
                     
                     while active_models or not response_queue.empty():
                         try:
                             # Get response with timeout to allow checking completion
                             try:
                                 event = response_queue.get(timeout=0.1)
+                                print(f"📤 Streaming event: {event['event_type']} from {event.get('model', 'unknown')}")
                                 yield f"data: {json.dumps(event)}\n\n"
                                 
                                 # Track model completion
                                 if event['event_type'] == 'model_end':
                                     completed_models.add(event['model_name'])
                                     active_models.discard(event['model_name'])
+                                    print(f"🏁 {event['model_name']} completed. Active models: {len(active_models)}")
                                 elif event['event_type'] == 'error':
                                     completed_models.add(event['model_name'])
                                     active_models.discard(event['model_name'])
+                                    print(f"❌ {event['model_name']} failed. Active models: {len(active_models)}")
                                     
-                            except:
+                            except Empty:
                                 # Queue timeout, check if all models are done
                                 pass
                             
