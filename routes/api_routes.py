@@ -525,9 +525,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 def process_model_response(model_name, response_text):
                     """Process individual model response and add to queue"""
                     try:
-                        # Send response in chunks for better streaming
+                        # Send response in smaller chunks for more frequent updates
                         words = response_text.split()
-                        chunk_size = max(1, len(words) // 20)  # Send ~20 chunks instead of word-by-word
+                        chunk_size = max(1, len(words) // 50)  # Send ~50 chunks for smoother streaming
                         
                         for i in range(0, len(words), chunk_size):
                             chunk = ' '.join(words[i:i + chunk_size]) + ' '
@@ -538,7 +538,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                                 'timestamp': time.time()
                             }
                             response_queue.put(event)
-                            time.sleep(0.05)  # Small delay between chunks
+                            time.sleep(0.02)  # Faster streaming for better interleaving
                             
                     except Exception as e:
                         error_event = {
@@ -601,34 +601,60 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                         for model_name in models_to_run
                     }
                     
-                    # Track active models
+                    # Track active models and their response queues
                     active_models = set(models_to_run)
-                    
-                    # Stream responses as they come in
+                    model_response_queues = {model: [] for model in models_to_run}
                     completed_models = set()
+                    
                     print(f"📡 Starting to stream responses from {len(active_models)} active models...")
                     
+                    # Main streaming loop with intelligent interleaving
                     while active_models or not response_queue.empty():
                         try:
                             # Get response with timeout to allow checking completion
                             try:
-                                event = response_queue.get(timeout=0.1)
+                                event = response_queue.get(timeout=0.05)  # Shorter timeout for more responsive streaming
                                 print(f"📤 Streaming event: {event['event_type']} from {event.get('model', 'unknown')}")
-                                yield f"data: {json.dumps(event)}\n\n"
                                 
-                                # Track model completion
-                                if event['event_type'] == 'model_end':
-                                    completed_models.add(event['model_name'])
-                                    active_models.discard(event['model_name'])
-                                    print(f"🏁 {event['model_name']} completed. Active models: {len(active_models)}")
-                                elif event['event_type'] == 'error':
-                                    completed_models.add(event['model_name'])
-                                    active_models.discard(event['model_name'])
-                                    print(f"❌ {event['model_name']} failed. Active models: {len(active_models)}")
+                                # For text generation events, store them in model-specific queues for interleaving
+                                if event['event_type'] == 'text_generation' and event.get('model'):
+                                    model = event['model']
+                                    if model in model_response_queues:
+                                        model_response_queues[model].append(event)
+                                
+                                # For non-text events, stream immediately
+                                if event['event_type'] != 'text_generation':
+                                    yield f"data: {json.dumps(event)}\n\n"
+                                    
+                                    # Track model completion
+                                    if event['event_type'] == 'model_end':
+                                        completed_models.add(event['model_name'])
+                                        active_models.discard(event['model_name'])
+                                        print(f"🏁 {event['model_name']} completed. Active models: {len(active_models)}")
+                                    elif event['event_type'] == 'error':
+                                        completed_models.add(event['model_name'])
+                                        active_models.discard(event['model_name'])
+                                        print(f"❌ {event['model_name']} failed. Active models: {len(active_models)}")
                                     
                             except Empty:
-                                # Queue timeout, check if all models are done
+                                # Queue timeout, implement intelligent interleaving
                                 pass
+                            
+                            # Implement intelligent interleaving for text generation
+                            if any(len(queue) > 0 for queue in model_response_queues.values()):
+                                # Find models with pending text
+                                models_with_text = [model for model, queue in model_response_queues.items() 
+                                                  if len(queue) > 0 and model in active_models]
+                                
+                                if models_with_text:
+                                    # Round-robin through models with text for fair interleaving
+                                    for model in models_with_text:
+                                        if model_response_queues[model]:
+                                            event = model_response_queues[model].pop(0)
+                                            yield f"data: {json.dumps(event)}\n\n"
+                                    
+                                    # Small delay to make interleaving visible
+                                    time.sleep(0.01)
                             
                             # Check if all futures are complete
                             done_futures = [f for f in future_to_model if f.done()]
@@ -640,8 +666,10 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                                     # Error already handled in run_model_analysis
                                     pass
                             
-                            # If all models are done and queue is empty, break
-                            if len(completed_models) == len(models_to_run) and response_queue.empty():
+                            # If all models are done and all queues are empty, break
+                            if (len(completed_models) == len(models_to_run) and 
+                                response_queue.empty() and 
+                                all(len(queue) == 0 for queue in model_response_queues.values())):
                                 break
                                 
                         except Exception as e:
