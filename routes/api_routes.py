@@ -488,6 +488,175 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             }
         )
 
+    @api.route('/analyze/stream/parallel', methods=['POST', 'OPTIONS'])
+    def analyze_videos_stream_parallel():
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
+        
+        """Parallel streaming video analysis with multiple models running simultaneously"""
+        from flask import Response, stream_with_context
+        import json
+        import time
+        import asyncio
+        import threading
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from queue import Queue
+        import uuid
+        
+        query = request.json.get('query')
+        models_to_run = request.json.get('models', ['gemini', 'pegasus'])  # Can specify multiple models
+        index_id = request.json.get('index_id') or session.get('selected_index_id')
+        video_id = request.json.get('video_id') or session.get('selected_video_id')
+        video_path = request.json.get('video_path') or session.get('video_path')
+        
+        if not query or not index_id or not video_id:
+            return jsonify({"status": "error", "message": "Missing required parameters"}), 400
+        
+        def generate_parallel_stream():
+            """Generate parallel streaming response"""
+            try:
+                # Send initial status
+                yield f"data: {json.dumps({'event_type': 'start', 'message': 'Parallel analysis started', 'models': models_to_run})}\n\n"
+                
+                # Create a queue to collect responses from all models
+                response_queue = Queue()
+                model_responses = {}
+                active_models = set()
+                
+                def process_model_response(model_name, response_text):
+                    """Process individual model response and add to queue"""
+                    try:
+                        words = response_text.split()
+                        for word in words:
+                            event = {
+                                'event_type': 'text_generation',
+                                'text': word + ' ',
+                                'model': model_name,
+                                'timestamp': time.time()
+                            }
+                            response_queue.put(event)
+                            time.sleep(0.02)  # Faster streaming for parallel
+                    except Exception as e:
+                        error_event = {
+                            'event_type': 'error',
+                            'model': model_name,
+                            'message': str(e),
+                            'timestamp': time.time()
+                        }
+                        response_queue.put(error_event)
+                
+                def run_model_analysis(model_name):
+                    """Run analysis for a specific model"""
+                    try:
+                        # Send model start event
+                        start_event = {
+                            'event_type': 'model_start',
+                            'model_name': model_name,
+                            'timestamp': time.time()
+                        }
+                        response_queue.put(start_event)
+                        
+                        # Run the actual analysis
+                        if model_name == 'gemini':
+                            response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
+                        elif model_name == 'pegasus':
+                            response = twelvelabs_service.generate_response(video_id, query, index_id)
+                        elif model_name == 'gpt4o':
+                            response = openai_model.generate_response(query, video_path, cache_manager)
+                        else:
+                            response = f"Unknown model: {model_name}"
+                        
+                        # Process the response
+                        process_model_response(model_name, response)
+                        
+                        # Send model end event
+                        end_event = {
+                            'event_type': 'model_end',
+                            'model_name': model_name,
+                            'timestamp': time.time()
+                        }
+                        response_queue.put(end_event)
+                        
+                    except Exception as e:
+                        error_event = {
+                            'event_type': 'error',
+                            'model': model_name,
+                            'message': str(e),
+                            'timestamp': time.time()
+                        }
+                        response_queue.put(error_event)
+                
+                # Start all models in parallel using ThreadPoolExecutor
+                with ThreadPoolExecutor(max_workers=len(models_to_run)) as executor:
+                    # Submit all model analysis tasks
+                    future_to_model = {
+                        executor.submit(run_model_analysis, model_name): model_name 
+                        for model_name in models_to_run
+                    }
+                    
+                    # Track active models
+                    active_models = set(models_to_run)
+                    
+                    # Stream responses as they come in
+                    completed_models = set()
+                    
+                    while active_models or not response_queue.empty():
+                        try:
+                            # Get response with timeout to allow checking completion
+                            try:
+                                event = response_queue.get(timeout=0.1)
+                                yield f"data: {json.dumps(event)}\n\n"
+                                
+                                # Track model completion
+                                if event['event_type'] == 'model_end':
+                                    completed_models.add(event['model_name'])
+                                    active_models.discard(event['model_name'])
+                                elif event['event_type'] == 'error':
+                                    completed_models.add(event['model_name'])
+                                    active_models.discard(event['model_name'])
+                                    
+                            except:
+                                # Queue timeout, check if all models are done
+                                pass
+                            
+                            # Check if all futures are complete
+                            done_futures = [f for f in future_to_model if f.done()]
+                            for future in done_futures:
+                                model_name = future_to_model[future]
+                                try:
+                                    future.result()  # This will raise any exceptions
+                                except Exception as e:
+                                    # Error already handled in run_model_analysis
+                                    pass
+                            
+                            # If all models are done and queue is empty, break
+                            if len(completed_models) == len(models_to_run) and response_queue.empty():
+                                break
+                                
+                        except Exception as e:
+                            yield f"data: {json.dumps({'event_type': 'error', 'message': f'Streaming error: {str(e)}'})}\n\n"
+                            break
+                
+                # Send completion signal
+                yield f"data: {json.dumps({'event_type': 'complete', 'message': 'Parallel analysis completed', 'models_analyzed': list(completed_models)})}\n\n"
+                yield "data: [DONE]\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'event_type': 'error', 'message': str(e)})}\n\n"
+        
+        return Response(
+            stream_with_context(generate_parallel_stream()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS'
+            }
+        )
+
 
     @api.route('/performance/stats', methods=['GET'])
     def get_performance_stats():
