@@ -16,14 +16,16 @@ def add_cors_headers(response):
     response.headers['Access-Control-Max-Age'] = '86400'
     return response
 
-def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_service, cache_manager):
+def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_service, cache_manager, nova_model):
     api = Blueprint('api', __name__)
     
     models_dict = {
         'gemini': gemini_model,
         'gemini-2.0-flash': gemini_model,
+        'gemini-2.5-pro': gemini_model,
         'gpt4o': openai_model,
-        'pegasus': twelvelabs_service
+        'pegasus': twelvelabs_service,
+        'nova': nova_model
     }
     
     optimized_analyzer = OptimizedVideoAnalyzer(
@@ -498,6 +500,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         from flask import Response, stream_with_context
         import json
         import time
+        import os
         from concurrent.futures import ThreadPoolExecutor
         from queue import Queue, Empty
         
@@ -507,8 +510,21 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         video_id = request.json.get('video_id') or session.get('selected_video_id')
         video_path = request.json.get('video_path') or session.get('video_path')
         
-        if not query or not index_id or not video_id:
-            return jsonify({"status": "error", "message": "Missing required parameters"}), 400
+        # If video_path is not provided, try to get it from video service
+        if not video_path and video_id:
+            try:
+                # Get video path from video service
+                video_filename = f"{video_id}.mp4"
+                video_path = os.path.join(Config.VIDEO_FOLDER, video_filename)
+                
+                # Check if video file exists
+                if not os.path.exists(video_path):
+                    return jsonify({"status": "error", "message": f"Video file not found. Please select a video first."}), 400
+            except Exception as e:
+                return jsonify({"status": "error", "message": f"Error getting video path: {str(e)}"}), 400
+        
+        if not query or not index_id or not video_id or not video_path:
+            return jsonify({"status": "error", "message": "Missing required parameters or video file not found"}), 400
         
         def generate_parallel_stream():
             """Generate parallel streaming response"""
@@ -564,11 +580,17 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                         # Run the actual analysis
                         print(f"⚡ Running {model_name} analysis...")
                         if model_name == 'gemini':
-                            response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
+                            response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                        elif model_name == 'gemini-2.0-flash':
+                            response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                        elif model_name == 'gemini-2.5-pro':
+                            response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro", cache_manager)
                         elif model_name == 'pegasus':
                             response = twelvelabs_service.generate_response(video_id, query, index_id)
                         elif model_name == 'gpt4o':
                             response = openai_model.generate_response(query, video_path, cache_manager)
+                        elif model_name == 'nova':
+                            response = nova_model.analyze_video(video_path, query)
                         else:
                             response = f"Unknown model: {model_name}"
                         

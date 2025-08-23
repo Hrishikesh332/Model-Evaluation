@@ -10,6 +10,7 @@ from services.twelvelabs_service import TwelveLabsService
 from services.video_service import VideoService
 from models.gemini_model import GeminiModel
 from models.openai_model import OpenAIModel
+from models.nova_model import NovaModel
 from routes.api_routes import create_api_routes
 
 from performance import performance_monitor, PerformanceMonitor, BenchmarkSuite
@@ -76,12 +77,15 @@ def create_app():
     video_service = VideoService(cache_manager)
     gemini_model = GeminiModel()
     openai_model = OpenAIModel()
+    nova_model = NovaModel()
 
     models_dict = {
         'gemini': gemini_model,
-        'gemini-2.0-flash': gemini_model, 
+        'gemini-2.0-flash': gemini_model,
+        'gemini-2.5-pro': gemini_model,
         'gpt4o': openai_model,
-        'pegasus': twelvelabs_service
+        'pegasus': twelvelabs_service,
+        'nova': nova_model
     }
     
     optimized_analyzer = OptimizedVideoAnalyzer(
@@ -100,7 +104,8 @@ def create_app():
         gemini_model, 
         openai_model, 
         video_service, 
-        cache_manager
+        cache_manager,
+        nova_model
     )
     app.register_blueprint(api_routes, url_prefix='/api')
 
@@ -246,6 +251,21 @@ def create_app():
             "message": "Internal server error occurred",
             "error_type": "server_error"
         }), 500
+
+    @app.route('/')
+    def root():
+        """Root endpoint with basic health check"""
+        return jsonify({
+            "status": "healthy",
+            "message": "Model Evaluation API is running",
+            "timestamp": datetime.now().isoformat(),
+            "version": "1.0.0",
+            "endpoints": {
+                "health": "/health",
+                "metrics": "/metrics",
+                "api": "/api/*"
+            }
+        })
 
     @app.errorhandler(404)
     def not_found(error):

@@ -15,8 +15,7 @@ class GeminiModel:
             genai.configure(api_key=api_key)
     
 
-    # Generate response using Gemini model
-    def generate_response(self, prompt, video_path=None, model_name="gemini-1.5-pro", cache_manager=None):
+    def generate_response(self, prompt, video_path=None, model_name="gemini-2.0-flash", cache_manager=None):
         
         try:
             if not self.api_key:
@@ -89,7 +88,7 @@ class GeminiModel:
             if not self.api_key:
                 return False, "No API key provided"
             
-            model = genai.GenerativeModel("gemini-1.5-pro")
+            model = genai.GenerativeModel("gemini-2.0-flash")
             response = model.generate_content("Hello")
             return True, "Connection successful"
         except Exception as e:

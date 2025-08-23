@@ -13,3 +13,4 @@ apscheduler
 numpy
 statistics
 structlog
+boto3
