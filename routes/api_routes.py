@@ -402,6 +402,92 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 "message": f"Error during analysis: {str(e)}"
             }), 500
 
+    @api.route('/analyze/stream', methods=['POST', 'OPTIONS'])
+    def analyze_videos_stream():
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
+        
+        """Streaming video analysis with real-time updates"""
+        from flask import Response, stream_with_context
+        import json
+        import time
+        
+        query = request.json.get('query')
+        selected_model = request.json.get('model', 'gemini')
+        index_id = request.json.get('index_id') or session.get('selected_index_id')
+        video_id = request.json.get('video_id') or session.get('selected_video_id')
+        video_path = request.json.get('video_path') or session.get('video_path')
+        
+        if not query or not index_id or not video_id:
+            return jsonify({"status": "error", "message": "Missing required parameters"}), 400
+        
+        def generate_stream():
+            """Generate streaming response"""
+            try:
+                # Send initial status
+                yield f"data: {json.dumps({'event_type': 'start', 'message': 'Analysis started'})}\n\n"
+                
+                # Process models
+                models_to_run = [selected_model]
+                if selected_model != 'pegasus':
+                    models_to_run.append('pegasus')
+                
+                for i, model_name in enumerate(models_to_run):
+                    # Send model start event
+                    yield f"data: {json.dumps({'event_type': 'model_start', 'model_name': model_name})}\n\n"
+                    
+                    try:
+                        if model_name == 'gemini':
+                            # Get Gemini response
+                            response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
+                            # Split response into chunks for streaming effect
+                            words = response.split()
+                            for word in words:
+                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word + ' ', 'model': model_name})}\n\n"
+                                time.sleep(0.03)  # Small delay for realistic streaming
+                        
+                        elif model_name == 'pegasus':
+                            # Get Pegasus response
+                            response = twelvelabs_service.generate_response(video_id, query, index_id)
+                            # Split response into chunks for streaming effect
+                            words = response.split()
+                            for word in words:
+                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word + ' ', 'model': model_name})}\n\n"
+                                time.sleep(0.03)
+                        
+                        elif model_name == 'gpt4o':
+                            response = openai_model.generate_response(query, video_path, cache_manager)
+                            words = response.split()
+                            for word in words:
+                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word + ' ', 'model': model_name})}\n\n"
+                                time.sleep(0.03)
+                    
+                    except Exception as e:
+                        yield f"data: {json.dumps({'event_type': 'error', 'model': model_name, 'message': str(e)})}\n\n"
+                    
+                    # Send model end event
+                    yield f"data: {json.dumps({'event_type': 'model_end', 'model_name': model_name})}\n\n"
+                
+                # Send completion signal
+                yield f"data: {json.dumps({'event_type': 'complete', 'message': 'Analysis completed'})}\n\n"
+                yield "data: [DONE]\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'event_type': 'error', 'message': str(e)})}\n\n"
+        
+        return Response(
+            stream_with_context(generate_stream()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS'
+            }
+        )
+
 
     @api.route('/performance/stats', methods=['GET'])
     def get_performance_stats():
