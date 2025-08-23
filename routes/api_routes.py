@@ -270,9 +270,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
     def get_available_models():
         """Get available AI models"""
         models = {
-            "pegasus": bool(session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY),
-            "gemini": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
+            "pegasus-1.2": bool(session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY),
             "gemini-2.0-flash": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
+            "gemini-2.5-pro": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
             "gpt4o": bool(session.get('openai_api_key') or Config.OPENAI_API_KEY)
         }
         
