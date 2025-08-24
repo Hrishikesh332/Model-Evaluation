@@ -3,6 +3,7 @@ from datetime import datetime
 from config import Config
 from performance import performance_monitor
 from optimize import OptimizedVideoAnalyzer, CacheOptimizer
+from services.twelvelabs_service import TwelveLabsService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -217,8 +218,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         print(f"🔑 Using API Key: {api_key[:10]}..." if api_key else "🔑 No API key available")
         
         if api_key:
-            twelvelabs_service.update_api_key(api_key)
-            indexes = twelvelabs_service.get_indexes()
+            # Create a temporary service instance for this request to avoid conflicts
+            temp_service = TwelveLabsService(api_key)
+            indexes = temp_service.get_indexes()
             if indexes and len(indexes) > 0:
                 session['twelvelabs_indexes'] = indexes
                 print(f"📊 Found {len(indexes)} indexes from {source}")
@@ -258,8 +260,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             return jsonify({"status": "success", "videos": session[cache_key], "cached": True, "source": source})
         
         if api_key:
-            twelvelabs_service.update_api_key(api_key)
-            videos = twelvelabs_service.get_index_videos(index_id)
+            # Create a temporary service instance for this request to avoid conflicts
+            temp_service = TwelveLabsService(api_key)
+            videos = temp_service.get_index_videos(index_id)
             if videos and len(videos) > 0:
                 session[cache_key] = videos
                 session[f"{cache_key}_expiry"] = datetime.now().timestamp() + 300
@@ -306,8 +309,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         }
         
         if api_key:
-            twelvelabs_service.update_api_key(api_key)
-            result = video_service.select_video(index_id, video_id, twelvelabs_service)
+            # Create a temporary service instance for this request to avoid conflicts
+            temp_service = TwelveLabsService(api_key)
+            result = video_service.select_video(index_id, video_id, temp_service)
             
             if result["success"]:
                 session['video_path'] = result["video_path"]
@@ -324,21 +328,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             return jsonify({
                 "status": "error", 
                 "message": "No TwelveLabs API key available. Please connect your API key or set TWELVELABS_API_KEY in environment."
-            }), 401
-        
-        twelvelabs_service.update_api_key(api_key)
-        result = video_service.select_video(index_id, video_id, twelvelabs_service)
-        
-        if result["success"]:
-            session['video_path'] = result["video_path"]
-            return jsonify({
-                "status": "success",
-                "message": result["message"],
-                "video_id": video_id,
-                "video_path": result["video_path"]
-            })
-        else:
-            return jsonify({"status": "error", "message": result["error"]}), 500
+            }), 500
 
     @api.route('/models', methods=['GET'])
     def get_available_models():
@@ -684,8 +674,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                             # Ensure we're using the correct API key
                             api_key = get_api_key('twelvelabs')
                             if api_key:
-                                twelvelabs_service.update_api_key(api_key)
-                                response = twelvelabs_service.generate_response(video_id, query, index_id)
+                                # Create a temporary service instance for this request to avoid conflicts
+                                temp_service = TwelveLabsService(api_key)
+                                response = temp_service.generate_response(video_id, query, index_id)
                             else:
                                 response = "Error: No TwelveLabs API key available"
                         elif model_name == 'gpt4o':
@@ -1073,8 +1064,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             session.pop('video_path', None)
             
             # Fetch fresh indexes
-            twelvelabs_service.update_api_key(api_key)
-            indexes = twelvelabs_service.get_indexes()
+            # Create a temporary service instance for this request to avoid conflicts
+            temp_service = TwelveLabsService(api_key)
+            indexes = temp_service.get_indexes()
             
             if indexes and len(indexes) > 0:
                 session['twelvelabs_indexes'] = indexes
@@ -1203,8 +1195,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             print("No API key available for thumbnail")
             return jsonify({"error": "No thumbnail available"}), 404
         
-        twelvelabs_service.update_api_key(api_key)
-        thumbnail_data = twelvelabs_service.get_video_thumbnail(index_id, video_id)
+        # Create a temporary service instance for this request to avoid conflicts
+        temp_service = TwelveLabsService(api_key)
+        thumbnail_data = temp_service.get_video_thumbnail(index_id, video_id)
         
         if thumbnail_data:
             return thumbnail_data, 200, {'Content-Type': 'image/jpeg'}
