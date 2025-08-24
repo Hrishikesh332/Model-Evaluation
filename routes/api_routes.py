@@ -203,28 +203,6 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             "api_status": status,
             "message": "Current API key status retrieved"
         })
-                return jsonify({"status": "error", "message": f"Failed to connect: {str(e)}"}), 400
-        
-        elif api_type == 'gemini':
-            session['gemini_api_key'] = api_key
-            gemini_model.update_api_key(api_key)
-            success, message = gemini_model.test_connection()
-            if success:
-                return jsonify({"status": "success", "message": "Gemini API key connected successfully"})
-            else:
-                return jsonify({"status": "error", "message": message}), 400
-        
-        elif api_type == 'openai':
-            session['openai_api_key'] = api_key
-            openai_model.update_api_key(api_key)
-            success, message = openai_model.test_connection()
-            if success:
-                return jsonify({"status": "success", "message": "OpenAI API key connected successfully"})
-            else:
-                return jsonify({"status": "error", "message": message}), 400
-        
-        else:
-            return jsonify({"status": "error", "message": "Invalid API type"}), 400
 
     @api.route('/indexes', methods=['GET', 'OPTIONS'])
     def get_indexes():
