@@ -101,23 +101,19 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 return jsonify({"status": "error", "message": f"Error connecting: {str(e)}"}), 500
         
         elif api_type == 'gemini':
-            session['gemini_api_key'] = api_key
-            gemini_model.update_api_key(api_key)
             return jsonify({
-                "status": "success", 
-                "message": "Gemini API key connected successfully"
-            })
+                "status": "error", 
+                "message": "Gemini API key management is restricted. Please use environment variables."
+            }), 403
         
         elif api_type == 'openai':
-            session['openai_api_key'] = api_key
-            openai_model.update_api_key(api_key)
             return jsonify({
-                "status": "success", 
-                "message": "OpenAI API key connected successfully"
-            })
+                "status": "error", 
+                "message": "OpenAI API key management is restricted. Please use environment variables."
+            }), 403
         
         else:
-            return jsonify({"status": "error", "message": f"Unknown API type: {api_type}"}), 400
+            return jsonify({"status": "error", "message": f"Unknown API type: {api_type}. Only 'twelvelabs' is supported for user management."}), 400
 
     @api.route('/disconnect', methods=['POST', 'OPTIONS'])
     def disconnect_api():
@@ -127,9 +123,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             return add_cors_headers(response)
             
         try:
-            # Clear all API keys from session
-            session.pop('gemini_api_key', None)
-            session.pop('openai_api_key', None)
+            # Clear only TwelveLabs API key from session (users can only manage this)
             session.pop('twelvelabs_api_key', None)
             
             # Clear all cached data
@@ -147,9 +141,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             session.pop('video_path', None)
             session.pop('last_known_video', None)
             
-            # Reset models to use environment variables
-            gemini_model.update_api_key(Config.GEMINI_API_KEY)
-            openai_model.update_api_key(Config.OPENAI_API_KEY)
+            # Reset TwelveLabs to use environment variable
             twelvelabs_service.update_api_key(Config.TWELVELABS_API_KEY)
             
             return jsonify({
@@ -184,24 +176,31 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             "twelvelabs": {
                 "connected": bool(session.get('twelvelabs_api_key')),
                 "source": "user_session" if session.get('twelvelabs_api_key') else "environment",
-                "has_key": bool(get_api_key('twelvelabs'))
+                "has_key": bool(get_api_key('twelvelabs')),
+                "user_manageable": True
             },
             "gemini": {
-                "connected": bool(session.get('gemini_api_key')),
-                "source": "user_session" if session.get('gemini_api_key') else "environment",
-                "has_key": bool(get_api_key('gemini'))
+                "connected": False,  # Users cannot connect Gemini keys
+                "source": "environment",  # Always environment
+                "has_key": bool(get_api_key('gemini')),
+                "user_manageable": False
             },
             "openai": {
-                "connected": bool(session.get('openai_api_key')),
-                "source": "user_session" if session.get('openai_api_key') else "environment",
-                "has_key": bool(get_api_key('openai'))
+                "connected": False,  # Users cannot connect OpenAI keys
+                "source": "environment",  # Always environment
+                "has_key": bool(get_api_key('openai')),
+                "user_manageable": False
             }
         }
         
         return jsonify({
             "status": "success",
             "api_status": status,
-            "message": "Current API key status retrieved"
+            "message": "Current API key status retrieved. Only TwelveLabs can be user-managed.",
+            "restrictions": {
+                "user_manageable": ["twelvelabs"],
+                "environment_only": ["gemini", "openai"]
+            }
         })
 
     @api.route('/indexes', methods=['GET', 'OPTIONS'])
@@ -351,7 +350,10 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             "gpt4o": bool(get_api_key('openai'))
         }
         
-        return jsonify({"status": "success", "models": models})
+        return jsonify({
+            "status": "success", 
+            "models": models
+        })
 
     @api.route('/analyze', methods=['POST', 'OPTIONS'])
     def analyze_videos():
