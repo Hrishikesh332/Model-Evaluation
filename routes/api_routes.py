@@ -98,6 +98,111 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                     return jsonify({"status": "error", "message": "Connected but no indexes found with this API key"}), 404
             except Exception as e:
                 print(f"Exception in connect_api: {str(e)}")
+                return jsonify({"status": "error", "message": f"Error connecting: {str(e)}"}), 500
+        
+        elif api_type == 'gemini':
+            session['gemini_api_key'] = api_key
+            gemini_model.update_api_key(api_key)
+            return jsonify({
+                "status": "success", 
+                "message": "Gemini API key connected successfully"
+            })
+        
+        elif api_type == 'openai':
+            session['openai_api_key'] = api_key
+            openai_model.update_api_key(api_key)
+            return jsonify({
+                "status": "success", 
+                "message": "OpenAI API key connected successfully"
+            })
+        
+        else:
+            return jsonify({"status": "error", "message": f"Unknown API type: {api_type}"}), 400
+
+    @api.route('/disconnect', methods=['POST', 'OPTIONS'])
+    def disconnect_api():
+        """Disconnect API keys and revert to environment defaults"""
+        if request.method == 'OPTIONS':
+            response = make_response()
+            return add_cors_headers(response)
+            
+        try:
+            # Clear all API keys from session
+            session.pop('gemini_api_key', None)
+            session.pop('openai_api_key', None)
+            session.pop('twelvelabs_api_key', None)
+            
+            # Clear all cached data
+            keys_to_remove = []
+            for key in session.keys():
+                if key.startswith('videos_') or key.endswith('_expiry') or key.startswith('twelvelabs_'):
+                    keys_to_remove.append(key)
+            
+            for key in keys_to_remove:
+                session.pop(key, None)
+            
+            # Clear selected index and video to force fresh selection
+            session.pop('selected_index_id', None)
+            session.pop('selected_video_id', None)
+            session.pop('video_path', None)
+            session.pop('last_known_video', None)
+            
+            # Reset models to use environment variables
+            gemini_model.update_api_key(Config.GEMINI_API_KEY)
+            openai_model.update_api_key(Config.OPENAI_API_KEY)
+            twelvelabs_service.update_api_key(Config.TWELVELABS_API_KEY)
+            
+            return jsonify({
+                "status": "success",
+                "message": "Disconnected from all APIs. Using environment defaults.",
+                "note": "Please re-select your index and video to continue.",
+                "cached_cleared": True
+            })
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"Error disconnecting: {str(e)}"
+            }), 500
+
+    def get_api_key(service_name):
+        """Get API key from session or fall back to environment variable"""
+        session_key = f'{service_name}_api_key'
+        env_key = f'{service_name.upper()}_API_KEY'
+        
+        # Try session first, then environment
+        api_key = session.get(session_key) or getattr(Config, env_key, None)
+        
+        if not api_key:
+            logger.warning(f"No API key found for {service_name} in session or environment")
+        
+        return api_key
+
+    @api.route('/status', methods=['GET'])
+    def get_api_status():
+        """Get current API key status and source"""
+        status = {
+            "twelvelabs": {
+                "connected": bool(session.get('twelvelabs_api_key')),
+                "source": "user_session" if session.get('twelvelabs_api_key') else "environment",
+                "has_key": bool(get_api_key('twelvelabs'))
+            },
+            "gemini": {
+                "connected": bool(session.get('gemini_api_key')),
+                "source": "user_session" if session.get('gemini_api_key') else "environment",
+                "has_key": bool(get_api_key('gemini'))
+            },
+            "openai": {
+                "connected": bool(session.get('openai_api_key')),
+                "source": "user_session" if session.get('openai_api_key') else "environment",
+                "has_key": bool(get_api_key('openai'))
+            }
+        }
+        
+        return jsonify({
+            "status": "success",
+            "api_status": status,
+            "message": "Current API key status retrieved"
+        })
                 return jsonify({"status": "error", "message": f"Failed to connect: {str(e)}"}), 400
         
         elif api_type == 'gemini':
@@ -127,13 +232,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             response = make_response()
             return add_cors_headers(response)
         
-        # Check if user has connected their own API key
-        user_api_key = session.get('twelvelabs_api_key')
-        env_api_key = Config.TWELVELABS_API_KEY
-        
-        # Priority: User's API key first, then environment API key
-        api_key = user_api_key or env_api_key
-        source = "user_session" if user_api_key else "environment"
+        # Get API key using helper function (session first, then environment)
+        api_key = get_api_key('twelvelabs')
+        source = "user_session" if session.get('twelvelabs_api_key') else "environment"
         
         print(f"🔑 API Key Source: {source}")
         print(f"🔑 Using API Key: {api_key[:10]}..." if api_key else "🔑 No API key available")
@@ -166,13 +267,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             response = make_response()
             return add_cors_headers(response)
         
-        # Check if user has connected their own API key
-        user_api_key = session.get('twelvelabs_api_key')
-        env_api_key = Config.TWELVELABS_API_KEY
-        
-        # Priority: User's API key first, then environment API key
-        api_key = user_api_key or env_api_key
-        source = "user_session" if user_api_key else "environment"
+        # Get API key using helper function (session first, then environment)
+        api_key = get_api_key('twelvelabs')
+        source = "user_session" if session.get('twelvelabs_api_key') else "environment"
         
         print(f"🎬 Getting videos for index {index_id} using {source} API key")
         
@@ -218,8 +315,8 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if not index_id or not video_id:
             return jsonify({"status": "error", "message": "Index ID and Video ID are required"}), 400
         
-        # First try session API key, then fall back to environment API key
-        api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        # Get API key using helper function (session first, then environment)
+        api_key = get_api_key('twelvelabs')
         
         session['selected_index_id'] = index_id
         session['selected_video_id'] = video_id
@@ -270,10 +367,10 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
     def get_available_models():
         """Get available AI models"""
         models = {
-            "pegasus-1.2": bool(session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY),
-            "gemini-2.0-flash": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
-            "gemini-2.5-pro": bool(session.get('gemini_api_key') or Config.GEMINI_API_KEY),
-            "gpt4o": bool(session.get('openai_api_key') or Config.OPENAI_API_KEY)
+            "pegasus-1.2": bool(get_api_key('twelvelabs')),
+            "gemini-2.0-flash": bool(get_api_key('gemini')),
+            "gemini-2.5-pro": bool(get_api_key('gemini')),
+            "gpt4o": bool(get_api_key('openai'))
         }
         
         return jsonify({"status": "success", "models": models})
@@ -580,15 +677,45 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                         # Run the actual analysis
                         print(f"⚡ Running {model_name} analysis...")
                         if model_name == 'gemini':
-                            response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                            # Ensure we're using the correct API key
+                            api_key = get_api_key('gemini')
+                            if api_key:
+                                gemini_model.update_api_key(api_key)
+                                response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                            else:
+                                response = "Error: No Gemini API key available"
                         elif model_name == 'gemini-2.0-flash':
-                            response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                            # Ensure we're using the correct API key
+                            api_key = get_api_key('gemini')
+                            if api_key:
+                                gemini_model.update_api_key(api_key)
+                                response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                            else:
+                                response = "Error: No Gemini API key available"
                         elif model_name == 'gemini-2.5-pro':
-                            response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro", cache_manager)
-                        elif model_name == 'pegasus':
-                            response = twelvelabs_service.generate_response(video_id, query, index_id)
+                            # Ensure we're using the correct API key
+                            api_key = get_api_key('gemini')
+                            if api_key:
+                                gemini_model.update_api_key(api_key)
+                                response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro", cache_manager)
+                            else:
+                                response = "Error: No Gemini API key available"
+                        elif model_name == 'pegasus' or model_name == 'pegasus-1.2':
+                            # Ensure we're using the correct API key
+                            api_key = get_api_key('twelvelabs')
+                            if api_key:
+                                twelvelabs_service.update_api_key(api_key)
+                                response = twelvelabs_service.generate_response(video_id, query, index_id)
+                            else:
+                                response = "Error: No TwelveLabs API key available"
                         elif model_name == 'gpt4o':
-                            response = openai_model.generate_response(query, video_path, cache_manager)
+                            # Ensure we're using the correct API key
+                            api_key = get_api_key('openai')
+                            if api_key:
+                                openai_model.update_api_key(api_key)
+                                response = openai_model.generate_response(query, video_path, cache_manager)
+                            else:
+                                response = "Error: No OpenAI API key available"
                         elif model_name == 'nova':
                             response = nova_model.analyze_video(video_path, query)
                         else:
