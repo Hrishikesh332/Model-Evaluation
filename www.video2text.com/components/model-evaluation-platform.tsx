@@ -188,22 +188,22 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
         parts.push(text.slice(lastIndex, match.index))
       }
 
-      // Add the timestamp as a button
+      // Add the timestamp as a minimalistic light green button
       const timestampContent = match[2] ? `${match[1]} - ${match[2]}` : match[1]
       parts.push(
         <button
           key={`timestamp-${match.index}`}
-          className="inline-flex items-center gap-1 px-2 py-0.5 mx-1 text-xs font-mono bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-md hover:shadow-sm transition-all duration-150 hover:scale-105"
+          className="inline-flex items-center gap-1 px-2 py-1 mx-1 text-xs font-mono bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-600/60 rounded-sm hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors duration-200"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={2}
+              strokeWidth={1.5}
               d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <span className="font-mono tracking-wide">{timestampContent}</span>
+          <span className="font-mono">{timestampContent}</span>
         </button>
       )
 
@@ -232,19 +232,12 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
   )
 }
 
-// Loading Component for better UX
+// Simple Loading Component
 const LoadingResponse = ({ response, timestamp }: { response: string; timestamp: Date }) => {
   return (
-    <div className="flex items-start gap-3">
-      <Loader2 className="w-5 h-5 animate-spin mt-1 text-blue-600 dark:text-blue-400" />
-      <div className="flex-1">
-        <div className="text-sm text-muted-foreground mb-2">
-          {response}
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>Started at: {timestamp.toLocaleTimeString()}</span>
-        </div>
-      </div>
+    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <Loader2 className="w-4 h-4 animate-spin" />
+      <span>{response}</span>
     </div>
   )
 }
@@ -262,33 +255,33 @@ const PerformanceMetrics = ({ metrics }: { metrics: any }) => {
   console.log("[v0] Displaying real performance metrics:", metrics)
 
   return (
-    <div className="mt-4 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-lg border-2 border-emerald-200 dark:border-emerald-700 shadow-lg">
+    <div className="mt-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-lg border border-emerald-200 dark:border-emerald-700 shadow-sm">
       <div className="flex items-center justify-between">
         {/* Left side - Rocket and metrics */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Rocket Icon */}
           <div className="flex-shrink-0">
-            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
           </div>
           
           {/* Metrics */}
-          <div className="flex items-center gap-6 text-sm">
+          <div className="flex items-center gap-4 text-xs">
             {/* Throughput */}
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-emerald-700 dark:text-emerald-300 text-lg">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-emerald-700 dark:text-emerald-300 text-sm">
                 {metrics.throughput}
               </span>
               <span className="text-emerald-600 dark:text-emerald-400 font-medium">t/s</span>
             </div>
             
-            {/* Separator */}
-            <div className="w-1 h-1 bg-emerald-400 rounded-full"></div>
-            
-            {/* Duration */}
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-emerald-700 dark:text-emerald-300 text-lg">
+            {/* Duration with Clock Icon */}
+            <div className="flex items-center gap-1">
+              <svg className="w-3 h-3 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="font-bold text-emerald-700 dark:text-emerald-300 text-sm">
                 {metrics.duration}s
               </span>
               <span className="text-emerald-600 dark:text-emerald-400 font-medium">total duration</span>
@@ -299,7 +292,7 @@ const PerformanceMetrics = ({ metrics }: { metrics: any }) => {
         {/* Right side - Additional info */}
         <div className="text-xs text-emerald-600 dark:text-emerald-400">
           {metrics.word_count && (
-            <span className="mr-3">Words: {metrics.word_count}</span>
+            <span className="mr-2">Words: {metrics.word_count}</span>
           )}
           {metrics.char_count && (
             <span>Chars: {metrics.char_count}</span>
@@ -334,6 +327,8 @@ export function ModelEvaluationPlatform() {
   const [videoProcessingStatus, setVideoProcessingStatus] = useState<string>("")
   const [isProcessing, setIsProcessing] = useState(false)
   const [performanceData, setPerformanceData] = useState<any>(null)
+  const [leftStreamingStarted, setLeftStreamingStarted] = useState(false)
+  const [rightStreamingStarted, setRightStreamingStarted] = useState(false)
   
   // Use the custom hook for API state management
   const {
@@ -457,6 +452,8 @@ export function ModelEvaluationPlatform() {
 
     loadVideos()
   }, [selectedIndex, isConnected])
+
+
 
   const showAlert = (message: string, type: "success" | "error" | "info") => {
     setAlert({ message, type })
@@ -682,23 +679,58 @@ export function ModelEvaluationPlatform() {
     console.log(`[v0] handleStreamUpdate called - Model: ${modelName}, Text length: ${fullText.length}`)
     console.log(`[v0] Performance data received:`, performanceData)
 
+    // Helper function to stop loading after a brief delay to ensure UI updates
+    const stopLoadingWithDelay = (isLeft: boolean) => {
+      setTimeout(() => {
+        if (isLeft) {
+          setLeftResponses((prev) => {
+            const newResponses = [...prev]
+            const lastIndex = newResponses.length - 1
+            if (newResponses[lastIndex] && newResponses[lastIndex].isLoading) {
+              newResponses[lastIndex] = {
+                ...newResponses[lastIndex],
+                isLoading: false,
+              }
+            }
+            return newResponses
+          })
+        } else {
+          setRightResponses((prev) => {
+            const newResponses = [...prev]
+            const lastIndex = newResponses.length - 1
+            if (newResponses[lastIndex] && newResponses[lastIndex].isLoading) {
+              newResponses[lastIndex] = {
+                ...newResponses[lastIndex],
+                isLoading: false,
+              }
+            }
+            return newResponses
+          })
+        }
+      }, 1000) // 1 second delay to ensure loader is visible
+    }
+
     // Update left compartment if it matches the left model
     if (modelName === leftModel) {
       console.log(`[v0] Updating left compartment for ${modelName}`)
+      setLeftStreamingStarted(true)
       setLeftResponses((prev) => {
         const newResponses = [...prev]
         const lastIndex = newResponses.length - 1
         if (newResponses[lastIndex] && !newResponses[lastIndex]?.error) {
           newResponses[lastIndex] = {
             ...newResponses[lastIndex],
-            response: fullText, // Use full accumulated text from API service
+            response: fullText,
             model: leftModel,
             timestamp: currentTimestamp,
-            isLoading: false,
+            isLoading: true, // Keep loading for a moment
             isStreaming: true,
-            performanceData: performanceData, // Store performance data
+            performanceData: performanceData,
           }
           console.log(`[v0] Left compartment updated with ${fullText.length} characters and performance data:`, performanceData)
+          
+          // Stop loading after delay
+          stopLoadingWithDelay(true)
         }
         return newResponses
       })
@@ -707,20 +739,24 @@ export function ModelEvaluationPlatform() {
     // Update right compartment if it matches the right model
     if (modelName === rightModel) {
       console.log(`[v0] Updating right compartment for ${modelName}`)
+      setRightStreamingStarted(true)
       setRightResponses((prev) => {
         const newResponses = [...prev]
         const lastIndex = newResponses.length - 1
         if (newResponses[lastIndex] && !newResponses[lastIndex]?.error) {
           newResponses[lastIndex] = {
             ...newResponses[lastIndex],
-            response: fullText, // Use full accumulated text from API service
+            response: fullText,
             model: rightModel,
             timestamp: currentTimestamp,
-            isLoading: false,
+            isLoading: true, // Keep loading for a moment
             isStreaming: true,
-            performanceData: performanceData, // Store performance data
+            performanceData: performanceData,
           }
           console.log(`[v0] Right compartment updated with ${fullText.length} characters and performance data:`, performanceData)
+          
+          // Stop loading after delay
+          stopLoadingWithDelay(false)
         }
         return newResponses
       })
@@ -729,7 +765,7 @@ export function ModelEvaluationPlatform() {
     // Handle case where model doesn't match left/right selection - assign to available compartment
     if (modelName !== leftModel && modelName !== rightModel) {
       console.log(`[v0] Model ${modelName} doesn't match selected models, assigning to right compartment`)
-      // Find which compartment to use based on available space
+      setRightStreamingStarted(true)
       setRightResponses((prev) => {
         const newResponses = [...prev]
         const lastIndex = newResponses.length - 1
@@ -739,10 +775,13 @@ export function ModelEvaluationPlatform() {
             response: fullText,
             model: modelName,
             timestamp: currentTimestamp,
-            isLoading: false,
+            isLoading: true, // Keep loading for a moment
             isStreaming: true,
-            performanceData: performanceData, // Store performance data
+            performanceData: performanceData,
           }
+          
+          // Stop loading after delay
+          stopLoadingWithDelay(false)
         }
         return newResponses
       })
@@ -803,6 +842,10 @@ export function ModelEvaluationPlatform() {
 
     const currentTimestamp = new Date()
     const userMessage = message.trim()
+    
+    // Reset streaming states for new query
+    setLeftStreamingStarted(false)
+    setRightStreamingStarted(false)
 
     // Clear input
     setMessage("")
@@ -842,7 +885,7 @@ export function ModelEvaluationPlatform() {
 
     // Add loading responses for both models
     const leftLoadingResponse = {
-      response: "Initializing analysis...",
+      response: "Loading...",
       model: leftModel,
       timestamp: currentTimestamp,
       isLoading: true,
@@ -853,7 +896,7 @@ export function ModelEvaluationPlatform() {
     }
 
     const rightLoadingResponse = {
-      response: "Initializing analysis...",
+      response: "Loading...",
       model: rightModel,
       timestamp: currentTimestamp,
       isLoading: true,
@@ -865,6 +908,9 @@ export function ModelEvaluationPlatform() {
 
     setLeftResponses((prev) => [...prev, leftLoadingResponse])
     setRightResponses((prev) => [...prev, rightLoadingResponse])
+
+    // Add a small delay to make the loading state feel more natural
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     try {
       console.log(`[v0] Starting parallel analysis with models: ${leftModel} and ${rightModel}`)
@@ -1269,7 +1315,7 @@ export function ModelEvaluationPlatform() {
               <Button variant="ghost" className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground">
                 <Clock className="w-4 h-4" />
                 <span
-                  className={isApiConnected ? "text-blue-600 dark:text-blue-400" : "text-green-600 dark:text-green-400"}
+                  className={isApiConnected ? "text-green-600 dark:text-green-400" : "text-green-600 dark:text-green-400"}
                 >
                   API: {isApiConnected ? "TwelveLabs Connected" : "Default Mode"}
                 </span>
@@ -1387,7 +1433,7 @@ export function ModelEvaluationPlatform() {
         {/* Left Panel - Models */}
         <div className="flex-1 flex flex-col bg-card/30 border-r border-border left-panel">
           <div className="border-b border-border px-6 py-4 flex items-center justify-between bg-card/50">
-            <h2 className="text-lg font-medium text-blue-600 dark:text-blue-400">Models</h2>
+            <h2 className="text-lg font-medium text-green-600 dark:text-green-400">Models</h2>
             <Select value={leftModel} onValueChange={setLeftModel}>
               <SelectTrigger className="w-56 bg-card border-border hover:bg-accent hover:text-accent-foreground shadow-sm">
                 <SelectValue />
@@ -1461,7 +1507,7 @@ export function ModelEvaluationPlatform() {
                           )}
                           {/* Model info */}
                           {response.model && response.model !== "user" && (
-                            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            <span className="text-xs text-green-600 dark:text-green-400 font-medium">
                               Model: {response.model}
                             </span>
                           )}
@@ -1574,7 +1620,7 @@ export function ModelEvaluationPlatform() {
                           )}
                           {/* Model info */}
                           {response.model && response.model !== "user" && (
-                            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                            <span className="text-xs text-green-600 dark:text-green-400 font-medium">
                               Model: {response.model}
                             </span>
                           )}
