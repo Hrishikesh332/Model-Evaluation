@@ -1,0 +1,61 @@
+import { type NextRequest, NextResponse } from "next/server"
+import { cookies } from "next/headers"
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000"
+
+export async function GET(request: NextRequest) {
+  try {
+    const cookieStore = cookies()
+    const apiMode = cookieStore.get('api_mode')?.value
+    const twelvelabsApiKey = cookieStore.get('twelvelabs_api_key')?.value
+
+    console.log("[v0] API Mode:", apiMode)
+    console.log("[v0] User API Key present:", !!twelvelabsApiKey)
+
+    // Determine the source of the API key
+    let source = "environment"
+    if (apiMode === "user" && twelvelabsApiKey) {
+      source = "user_session"
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+
+    // If user has provided an API key, include it in the request
+    if (source === "user_session" && twelvelabsApiKey) {
+      headers["X-API-Key"] = twelvelabsApiKey
+      console.log("[v0] Using user-provided API key for indexes")
+    } else {
+      console.log("[v0] Using environment API key for indexes")
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/indexes`, {
+      method: "GET",
+      headers,
+    })
+
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    
+    // Add source information to the response
+    const responseData = {
+      ...data,
+      source,
+      message: source === "user_session" ? "Using user API key" : "Using environment API key"
+    }
+    
+    console.log("[v0] Indexes response from backend:", responseData.message)
+    return NextResponse.json(responseData)
+  } catch (error) {
+    console.error("Failed to fetch indexes:", error)
+    return NextResponse.json({ 
+      status: "error",
+      message: "Failed to fetch indexes",
+      error: error instanceof Error ? error.message : "Unknown error"
+    }, { status: 500 })
+  }
+}
