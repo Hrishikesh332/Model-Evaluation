@@ -77,8 +77,8 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
         const number = line.match(/^(\d+)\.\s/)?.[1] || ''
         return (
           <div key={lineIndex} className="mb-3 pl-4 flex items-start">
-            <span className="text-muted-foreground mr-3 mt-0.5 font-medium min-w-[20px]">{number}.</span>
-            <div className="text-foreground flex-1">
+            <span className="text-muted-foreground mr-3 mt-0.5 font-medium min-w-[20px] flex-shrink-0">{number}.</span>
+            <div className="text-foreground flex-1 min-w-0">
               {renderInlineTimestamps(content)}
             </div>
           </div>
@@ -90,8 +90,8 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
         const content = line.replace(/^\s*[-*]\s/, '')
         return (
           <div key={lineIndex} className="mb-2 pl-8 flex items-start">
-            <span className="text-muted-foreground mr-2 mt-0.5">•</span>
-            <div className="text-foreground flex-1">{renderInlineTimestamps(content)}</div>
+            <span className="text-muted-foreground mr-2 mt-0.5 flex-shrink-0">•</span>
+            <div className="text-foreground flex-1 min-w-0">{renderInlineTimestamps(content)}</div>
           </div>
         )
       }
@@ -101,9 +101,9 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
         const parts = line.split("**")
         return (
           <div key={lineIndex} className="mb-2 pl-8 flex items-start">
-            <span className="text-muted-foreground mr-2 mt-0.5">•</span>
-            <span className="font-medium text-foreground">{parts[1]}</span>
-            {parts[2] && <span className="text-muted-foreground ml-1">{renderInlineTimestamps(parts[2].replace(/^:\s*/, ""))}</span>}
+            <span className="text-muted-foreground mr-2 mt-0.5 flex-shrink-0">•</span>
+            <span className="font-medium text-foreground flex-shrink-0">{parts[1]}</span>
+            {parts[2] && <span className="text-muted-foreground ml-1 flex-1 min-w-0">{renderInlineTimestamps(parts[2].replace(/^:\s*/, ""))}</span>}
           </div>
         )
       }
@@ -140,7 +140,7 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
       if (line.startsWith("```")) {
         return (
           <div key={lineIndex} className="mb-2">
-            <div className="bg-muted/50 p-3 rounded-md font-mono text-sm">
+            <div className="bg-muted/50 p-3 rounded-md font-mono text-sm overflow-x-auto">
               {line.replace(/```/, '')}
             </div>
           </div>
@@ -164,7 +164,7 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
       if (line.trim()) {
         return (
           <div key={lineIndex} className="mb-2">
-            <span className="text-foreground leading-relaxed">
+            <span className="text-foreground leading-relaxed break-words">
               {renderInlineTimestamps(line)}
             </span>
           </div>
@@ -193,9 +193,9 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
       parts.push(
         <button
           key={`timestamp-${match.index}`}
-          className="inline-flex items-center gap-1 px-2 py-1 mx-1 text-xs font-mono bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-600/60 rounded-sm hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors duration-200"
+          className="inline-flex items-center gap-1 px-2 py-1 mx-1 text-xs font-mono bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-300 dark:border-green-600/60 rounded-sm hover:bg-green-200 dark:hover:bg-green-900/30 transition-colors duration-200 flex-shrink-0"
         >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -218,14 +218,36 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
     return parts.length > 0 ? parts : text
   }
 
+  // During streaming, show plain text to prevent layout shifts
+  if (isStreaming) {
+    console.log("[v0] ResponseContent: Rendering streaming view for response length:", response.length)
+    return (
+      <div className="space-y-2">
+        <div className="prose prose-sm max-w-none overflow-hidden">
+          <div className="text-foreground leading-relaxed break-words whitespace-pre-wrap font-mono text-sm bg-muted/30 p-3 rounded-md relative">
+            <div className="absolute top-2 right-2 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Streaming...</span>
+            </div>
+            {response}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // After streaming is complete, render the full markdown with timestamps
+  console.log("[v0] ResponseContent: Rendering final markdown view for response length:", response.length)
+
+  // After streaming is complete, render the full markdown with timestamps
   return (
-    <div className="space-y-2">
-      <div className="prose prose-sm max-w-none">
+    <div className="space-y-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-500">
+      <div className="prose prose-sm max-w-none overflow-hidden">
         {renderMarkdownText(response)}
       </div>
 
       {/* Only show performance metrics for model responses when streaming is complete and we have real data */}
-      {performanceData && !isStreaming && !response.includes("You") && performanceData.throughput && performanceData.duration && (
+      {performanceData && !response.includes("You") && performanceData.throughput && performanceData.duration && (
         <PerformanceMetrics metrics={performanceData} />
       )}
     </div>
@@ -729,8 +751,24 @@ export function ModelEvaluationPlatform() {
           }
           console.log(`[v0] Left compartment updated with ${fullText.length} characters and performance data:`, performanceData)
           
-          // Stop loading after delay
-          stopLoadingWithDelay(true)
+              // Stop loading after delay
+    stopLoadingWithDelay(true)
+    
+    // Also mark streaming as complete after a longer delay as fallback
+    setTimeout(() => {
+      setLeftResponses((prev) => {
+        const newResponses = [...prev]
+        const lastIndex = newResponses.length - 1
+        if (newResponses[lastIndex] && newResponses[lastIndex].isStreaming) {
+          newResponses[lastIndex] = {
+            ...newResponses[lastIndex],
+            isStreaming: false,
+          }
+          console.log(`[v0] Fallback: Left compartment streaming marked as complete`)
+        }
+        return newResponses
+      })
+    }, 3000) // 3 second fallback
         }
         return newResponses
       })
@@ -782,6 +820,22 @@ export function ModelEvaluationPlatform() {
           
           // Stop loading after delay
           stopLoadingWithDelay(false)
+          
+          // Also mark streaming as complete after a longer delay as fallback
+          setTimeout(() => {
+            setRightResponses((prev) => {
+              const newResponses = [...prev]
+              const lastIndex = newResponses.length - 1
+              if (newResponses[lastIndex] && newResponses[lastIndex].isStreaming) {
+                newResponses[lastIndex] = {
+                  ...newResponses[lastIndex],
+                  isStreaming: false,
+                }
+                console.log(`[v0] Fallback: Right compartment streaming marked as complete for ${modelName}`)
+              }
+              return newResponses
+            })
+          }, 3000) // 3 second fallback
         }
         return newResponses
       })
@@ -790,6 +844,7 @@ export function ModelEvaluationPlatform() {
 
   const handleStreamComplete = (modelName: string, finalPerformanceData?: any) => {
     console.log(`[v0] handleStreamComplete called - Model: ${modelName}, Final performance data:`, finalPerformanceData)
+    console.log(`[v0] Current left model: ${leftModel}, right model: ${rightModel}`)
     
     const currentTimestamp = new Date()
 
@@ -822,6 +877,27 @@ export function ModelEvaluationPlatform() {
           newResponses[lastIndex] = {
             ...newResponses[lastIndex],
             model: rightModel,
+            timestamp: currentTimestamp,
+            isLoading: false,
+            isStreaming: false, // Mark streaming as complete
+            performanceData: finalPerformanceData || newResponses[lastIndex].performanceData,
+          }
+          console.log(`[v0] Right compartment streaming completed for ${modelName}`)
+        }
+        return newResponses
+      })
+    }
+
+    // Handle case where model doesn't match left/right selection - assign to available compartment
+    if (modelName !== leftModel && modelName !== rightModel) {
+      console.log(`[v0] Model ${modelName} doesn't match selected models, completing in right compartment`)
+      setRightResponses((prev) => {
+        const newResponses = [...prev]
+        const lastIndex = newResponses.length - 1
+        if (newResponses[lastIndex] && !newResponses[lastIndex]?.error) {
+          newResponses[lastIndex] = {
+            ...newResponses[lastIndex],
+            model: modelName,
             timestamp: currentTimestamp,
             isLoading: false,
             isStreaming: false, // Mark streaming as complete
