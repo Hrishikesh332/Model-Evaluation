@@ -220,7 +220,7 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
 
   // During streaming, show plain text to prevent layout shifts
   if (isStreaming) {
-    console.log("[v0] ResponseContent: Rendering streaming view for response length:", response.length)
+    console.log("ResponseContent: Rendering streaming view for response length:", response.length)
     return (
       <div className="space-y-2">
         <div className="prose prose-sm max-w-none overflow-hidden">
@@ -237,7 +237,7 @@ const ResponseContent = ({ response, performanceData, isStreaming = false }: { r
   }
 
   // After streaming is complete, render the full markdown with timestamps
-  console.log("[v0] ResponseContent: Rendering final markdown view for response length:", response.length)
+  console.log("ResponseContent: Rendering final markdown view for response length:", response.length)
 
   // After streaming is complete, render the full markdown with timestamps
   return (
@@ -266,15 +266,15 @@ const LoadingResponse = ({ response, timestamp }: { response: string; timestamp:
 
 // Performance Metrics Component
 const PerformanceMetrics = ({ metrics }: { metrics: any }) => {
-  console.log("[v0] PerformanceMetrics component called with:", metrics)
+  console.log("PerformanceMetrics component called with:", metrics)
   
   // Only show if we have real performance data
   if (!metrics || !metrics.throughput || !metrics.duration) {
-    console.log("[v0] No real performance data available")
+    console.log("No real performance data available")
     return null
   }
 
-  console.log("[v0] Displaying real performance metrics:", metrics)
+  console.log("Displaying real performance metrics:", metrics)
 
   return (
     <div className="mt-3 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/30 dark:to-teal-900/30 rounded-lg border border-emerald-200 dark:border-emerald-700 shadow-sm">
@@ -435,17 +435,17 @@ export function ModelEvaluationPlatform() {
     const loadVideos = async () => {
       if (selectedIndex) {
         setIsLoadingData(true)
-        console.log(`[v0] Loading videos for index: ${selectedIndex.name} (${selectedIndex.id})`)
+        console.log(`Loading videos for index: ${selectedIndex.name} (${selectedIndex.id})`)
         try {
           const videosResponse = await apiService.getVideos(selectedIndex.id)
-          console.log(`[v0] Loaded ${videosResponse.videos.length} videos for index ${selectedIndex.name}`)
+          console.log(`Loaded ${videosResponse.videos.length} videos for index ${selectedIndex.name}`)
           setVideos(videosResponse.videos)
 
           if (videosResponse.videos.length > 0) {
             setSelectedVideo(videosResponse.videos[0])
             // Select the video in the API
             await apiService.selectVideo(selectedIndex.id, videosResponse.videos[0].id)
-            console.log(`[v0] Auto-selected first video: ${videosResponse.videos[0].name}`)
+            console.log(`Auto-selected first video: ${videosResponse.videos[0].name}`)
           } else {
             // Handle case where index has no videos
             setSelectedVideo(null)
@@ -493,7 +493,7 @@ export function ModelEvaluationPlatform() {
 
     try {
       // Step 1: Connect the API key
-      console.log("[v0] Step 1: Connecting API key...")
+      console.log("Step 1: Connecting API key...")
       await hookConnectApiKey("twelvelabs", apiKey)
 
       // Step 2: Clear existing data immediately

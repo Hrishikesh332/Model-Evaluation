@@ -127,7 +127,7 @@ class ApiService {
   // Video Management
   async getIndexes(): Promise<{ indexes: Index[]; source?: string; message?: string }> {
     const response = await this.request(`/api/indexes?t=${Date.now()}`)
-    console.log("[v0] getIndexes raw response:", response)
+    console.log("getIndexes raw response:", response)
 
     // Handle different response formats from the API
     if (Array.isArray(response)) {
@@ -137,14 +137,14 @@ class ApiService {
     } else if (response && Array.isArray(response.indexes)) {
       return response
     } else {
-      console.error("[v0] Unexpected indexes response format:", response)
+      console.error("Unexpected indexes response format:", response)
       throw new Error("Invalid response format from indexes API")
     }
   }
 
   async getVideos(indexId: string): Promise<{ videos: Video[]; source?: string; message?: string }> {
     const response = await this.request(`/api/indexes/${indexId}/videos?t=${Date.now()}`)
-    console.log("[v0] getVideos raw response:", response)
+    console.log("getVideos raw response:", response)
 
     // Handle different response formats from the API
     if (Array.isArray(response)) {
@@ -154,7 +154,7 @@ class ApiService {
     } else if (response && Array.isArray(response.videos)) {
       return response
     } else {
-      console.error("[v0] Unexpected videos response format:", response)
+      console.error("Unexpected videos response format:", response)
       throw new Error("Invalid response format from videos API")
     }
   }
@@ -201,11 +201,11 @@ class ApiService {
       })
 
       if (streamResponse.ok && streamResponse.headers.get("content-type")?.includes("text/event-stream")) {
-        console.log("[v0] Using streaming endpoint")
+        console.log("Using streaming endpoint")
         return this.handleStreamingResponse(streamResponse, onStreamUpdate)
       }
     } catch (error) {
-      console.log("[v0] Streaming endpoint failed, falling back to regular endpoint:", error)
+      console.log("Streaming endpoint failed, falling back to regular endpoint:", error)
     }
 
     // Fallback to regular endpoint
@@ -233,10 +233,10 @@ class ApiService {
     // Check if response is streaming
     const contentType = response.headers.get("content-type")
     if (contentType && contentType.includes("text/event-stream")) {
-      console.log("[v0] Regular endpoint returned streaming response")
+              console.log("Regular endpoint returned streaming response")
       return this.handleStreamingResponse(response, onStreamUpdate)
     } else {
-      console.log("[v0] Using regular JSON response")
+              console.log("Using regular JSON response")
       const data = await response.json()
       if (data.status === "error") {
         throw new Error(data.message || "API request failed")
@@ -255,8 +255,8 @@ class ApiService {
     onStreamUpdate?: (text: string, modelName: string, performanceData?: any) => void,
     onStreamComplete?: (modelName: string, finalPerformanceData?: any) => void,
   ): Promise<SearchResponse | StreamingResponse> {
-    console.log("[v0] analyzeVideoParallel called with models:", models)
-    console.log("[v0] Attempting parallel streaming endpoint:", `${API_BASE_URL}/api/analyze/stream/parallel`)
+    console.log("analyzeVideoParallel called with models:", models)
+    console.log("Attempting parallel streaming endpoint:", `${API_BASE_URL}/api/analyze/stream/parallel`)
 
     // Try parallel streaming endpoint first
     try {
@@ -276,20 +276,20 @@ class ApiService {
         }),
       })
 
-      console.log("[v0] Parallel streaming response status:", streamResponse.status)
-      console.log("[v0] Parallel streaming response content-type:", streamResponse.headers.get("content-type"))
+      console.log("Parallel streaming response status:", streamResponse.status)
+      console.log("Parallel streaming response content-type:", streamResponse.headers.get("content-type"))
 
       if (streamResponse.ok && streamResponse.headers.get("content-type")?.includes("text/event-stream")) {
-        console.log("[v0] ✅ Successfully using parallel streaming endpoint with models:", models)
+        console.log("✅ Successfully using parallel streaming endpoint with models:", models)
         return this.handleParallelStreamingResponse(streamResponse, onStreamUpdate, onStreamComplete)
       } else {
-        console.log("[v0] ❌ Parallel streaming endpoint failed or returned non-streaming response")
+        console.log("❌ Parallel streaming endpoint failed or returned non-streaming response")
       }
     } catch (error) {
-      console.log("[v0] ❌ Parallel streaming endpoint failed with error:", error)
+      console.log("❌ Parallel streaming endpoint failed with error:", error)
     }
 
-    console.log("[v0] ⚠️ Falling back to single model streaming with first model:", models[0])
+    console.log("⚠️ Falling back to single model streaming with first model:", models[0])
     // Fallback to regular streaming with first model
     return this.analyzeVideo(query, models[0], execution_mode, compare_models, indexId, videoId, onStreamUpdate)
   }
@@ -351,18 +351,18 @@ class ApiService {
 
                 try {
                   const data = JSON.parse(dataStr)
-                  console.log("[v0] Streaming event:", data.event_type, data.model || "unknown")
+                  console.log("Streaming event:", data.event_type, data.model || "unknown")
 
                   switch (data.event_type) {
                     case "start":
-                      console.log("[v0] Analysis started")
+                      console.log("Analysis started")
                       break
 
                     case "model_start":
                       const modelName = data.model_name || data.model
                       if (modelName) {
                         modelTexts[modelName] = ""
-                        console.log(`[v0] Model ${modelName} started`)
+                        console.log(`Model ${modelName} started`)
                       }
                       break
 
@@ -387,7 +387,7 @@ class ApiService {
                       const endModel = data.model_name || data.model
                       if (endModel && modelTexts[endModel]) {
                         responses[endModel] = modelTexts[endModel]
-                        console.log(`[v0] Model ${endModel} completed`)
+                        console.log(`Model ${endModel} completed`)
                       }
                       break
 
@@ -414,7 +414,7 @@ class ApiService {
                       }
                       if (data.model && data.metrics) {
                         performanceData[data.model] = data.metrics
-                        console.log(`[v0] Performance metrics for ${data.model}:`, data.metrics)
+                        console.log(`Performance metrics for ${data.model}:`, data.metrics)
                         
                         // Call completion callback with performance data
                         if (onStreamComplete) {
@@ -428,7 +428,7 @@ class ApiService {
                       return
                   }
                 } catch (e) {
-                  console.warn("[v0] Failed to parse streaming data:", e, "Raw data:", dataStr)
+                  console.warn("Failed to parse streaming data:", e, "Raw data:", dataStr)
                 }
               }
             }
@@ -502,11 +502,11 @@ class ApiService {
 
                 try {
                   const data = JSON.parse(dataStr)
-                  console.log("[v0] Streaming event:", data.event_type, data.model || data.model_name || "unknown")
+                  console.log("Streaming event:", data.event_type, data.model || data.model_name || "unknown")
 
                   switch (data.event_type) {
                     case "start":
-                      console.log("[v0] Parallel analysis started with models:", data.models)
+                      console.log("Parallel analysis started with models:", data.models)
                       // Initialize all models with empty text
                       if (data.models && Array.isArray(data.models)) {
                         data.models.forEach((model: string) => {
@@ -523,7 +523,7 @@ class ApiService {
                           modelTexts[modelName] = ""
                         }
                         modelStatus[modelName] = "active"
-                        console.log(`[v0] Model ${modelName} started streaming`)
+                        console.log(`Model ${modelName} started streaming`)
 
                         // Initialize UI with empty text for immediate streaming
                         if (onStreamUpdate) {
@@ -546,7 +546,7 @@ class ApiService {
                         modelTexts[textModel] += textChunk
 
                         console.log(
-                          `[v0] Text chunk for ${textModel}: "${textChunk}" (total length: ${modelTexts[textModel].length})`,
+                          `Text chunk for ${textModel}: "${textChunk}" (total length: ${modelTexts[textModel].length})`,
                         )
 
                         // Update UI immediately with accumulated text
@@ -554,7 +554,7 @@ class ApiService {
                           onStreamUpdate(modelTexts[textModel], textModel, performanceData)
                         }
                       } else {
-                        console.warn("[v0] Missing text or model in text_generation event:", {
+                        console.warn("Missing text or model in text_generation event:", {
                           textModel,
                           textChunk,
                           data,
@@ -569,7 +569,7 @@ class ApiService {
                         completedModels.add(endModel)
                         responses[endModel] = modelTexts[endModel] || ""
                         console.log(
-                          `[v0] Model ${endModel} completed with ${modelTexts[endModel]?.length || 0} characters`,
+                          `Model ${endModel} completed with ${modelTexts[endModel]?.length || 0} characters`,
                         )
 
                         if (onStreamUpdate && modelTexts[endModel]) {
@@ -582,9 +582,9 @@ class ApiService {
                       // Copy all model texts to final responses
                       Object.assign(responses, modelTexts)
                       isComplete = true
-                      console.log("[v0] Parallel streaming completed for all models")
+                      console.log("Parallel streaming completed for all models")
                       console.log(
-                        "[v0] Final responses:",
+                        "Final responses:",
                         Object.keys(responses).map((model) => `${model}: ${responses[model]?.length || 0} chars`),
                       )
                       resolve({
@@ -606,7 +606,7 @@ class ApiService {
                       }
                       if (data.model && data.metrics) {
                         performanceData[data.model] = data.metrics
-                        console.log(`[v0] Performance metrics for ${data.model}:`, data.metrics)
+                        console.log(`Performance metrics for ${data.model}:`, data.metrics)
                         
                         // Call completion callback with performance data
                         if (onStreamComplete) {
@@ -627,16 +627,16 @@ class ApiService {
                         if (onStreamUpdate) {
                           onStreamUpdate(modelTexts[errorModel], errorModel, performanceData)
                         }
-                        console.log(`[v0] Model ${errorModel} failed: ${errorMessage}`)
+                        console.log(`Model ${errorModel} failed: ${errorMessage}`)
                       } else {
-                        console.error("[v0] General streaming error:", errorMessage)
+                        console.error("General streaming error:", errorMessage)
                         reject(new Error(errorMessage))
                         return
                       }
                       break
                   }
                 } catch (e) {
-                  console.warn("[v0] Failed to parse parallel streaming data:", e, "Raw data:", dataStr)
+                  console.warn("Failed to parse parallel streaming data:", e, "Raw data:", dataStr)
                 }
               }
             }

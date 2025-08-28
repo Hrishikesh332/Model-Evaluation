@@ -9,8 +9,8 @@ export async function GET(request: NextRequest) {
     const apiMode = cookieStore.get('api_mode')?.value
     const twelvelabsApiKey = cookieStore.get('twelvelabs_api_key')?.value
 
-    console.log("[v0] Models API - API Mode:", apiMode)
-    console.log("[v0] Models API - User API Key present:", !!twelvelabsApiKey)
+    console.log("Models API - API Mode:", apiMode)
+    console.log("Models API - User API Key present:", !!twelvelabsApiKey)
 
     // Determine the source of the API key
     let source = "environment"
@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
     // If user has provided an API key, include it in the request
     if (source === "user_session" && twelvelabsApiKey) {
       headers["X-API-Key"] = twelvelabsApiKey
-      console.log("[v0] Models API - Using user-provided API key")
+      console.log("Models API - Using user-provided API key")
     } else {
-      console.log("[v0] Models API - Using environment API key")
+      console.log("Models API - Using environment API key")
     }
 
     const response = await fetch(`${API_BASE_URL}/api/models`, {
