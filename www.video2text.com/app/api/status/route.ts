@@ -5,23 +5,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     
     // Check if we have API keys in cookies (user mode)
     const twelvelabsKey = cookieStore.get('twelvelabs_api_key')?.value
-    const geminiKey = cookieStore.get('gemini_api_key')?.value
-    const openaiKey = cookieStore.get('openai_api_key')?.value
     const apiMode = cookieStore.get('api_mode')?.value
 
     // If we have user API keys, proxy to backend with those keys
-    if (apiMode === 'user' && (twelvelabsKey || geminiKey || openaiKey)) {
+    if (apiMode === 'user' && twelvelabsKey) {
       const response = await fetch(`${API_BASE_URL}/api/status`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          ...(twelvelabsKey && { 'X-TwelveLabs-API-Key': twelvelabsKey }),
-          ...(geminiKey && { 'X-Gemini-API-Key': geminiKey }),
-          ...(openaiKey && { 'X-OpenAI-API-Key': openaiKey }),
+          'X-TwelveLabs-API-Key': twelvelabsKey,
         },
       })
 
@@ -30,7 +26,12 @@ export async function GET(request: NextRequest) {
       }
 
       const data = await response.json()
-      return NextResponse.json(data)
+      return NextResponse.json({
+        ...data,
+        connected: true,
+        source: 'user_session',
+        type: 'twelvelabs'
+      })
     }
 
     // If no user keys, check environment mode
@@ -46,7 +47,12 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json()
-    return NextResponse.json(data)
+    return NextResponse.json({
+      ...data,
+      connected: data.api_status?.twelvelabs?.has_key || false,
+      source: 'environment',
+      type: 'twelvelabs'
+    })
   } catch (error) {
     console.error("Failed to get API status:", error)
     return NextResponse.json({ 

@@ -643,22 +643,48 @@ export function ModelEvaluationPlatform() {
 
   const handleSwitchToDefault = async () => {
     try {
+      setIsConnecting(true)
+      showAlert("Switching to default API configuration...", "info")
+      
       await hookDisconnectApiKey()
       setApiKey("")
 
       // Clear responses and reload data
       setLeftResponses([])
       setRightResponses([])
+      setIndexes([])
+      setVideos([])
+      setSelectedIndex(null)
+      setSelectedVideo(null)
 
-      showAlert("Switched back to default API configuration", "info")
+      showAlert("✅ Switched to default API configuration. Reloading data...", "success")
 
       setIsDialogOpen(false)
       
-      // Reload the page to refresh the API state
-      window.location.reload()
+      // Wait a moment for the disconnect to complete, then reload data
+      setTimeout(async () => {
+        try {
+          setIsLoadingData(true)
+          const indexesResponse = await apiService.getIndexes()
+          setIndexes(indexesResponse.indexes)
+          
+          if (indexesResponse.indexes.length > 0) {
+            setSelectedIndex(indexesResponse.indexes[0])
+          }
+          
+          showAlert("✅ Default configuration loaded successfully", "success")
+        } catch (error) {
+          console.error("Failed to reload data with default config:", error)
+          showAlert("⚠️ Switched to default but failed to reload data. Please refresh the page.", "info")
+        } finally {
+          setIsLoadingData(false)
+          setIsConnecting(false)
+        }
+      }, 1000)
     } catch (error) {
       console.error("Failed to disconnect API key:", error)
       showAlert("Failed to disconnect API key. Please try again.", "error")
+      setIsConnecting(false)
     }
   }
 
@@ -1388,86 +1414,100 @@ export function ModelEvaluationPlatform() {
           {/* API Connection Dialog */}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground">
-                <Clock className="w-4 h-4" />
-                <span
-                  className={isApiConnected ? "text-green-600 dark:text-green-400" : "text-green-600 dark:text-green-400"}
-                >
-                  API: {isApiConnected ? "TwelveLabs Connected" : "Default Mode"}
+              <Button variant="ghost" className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 text-black dark:text-white">
+                <Settings className="w-4 h-4" />
+                <span className="text-sm font-medium">
+                  {isApiConnected ? "User API" : "Default API"}
                 </span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border">
-              <DialogHeader>
-                <DialogTitle className="text-foreground">Connect TwelveLabs API KEY</DialogTitle>
+            <DialogContent className="bg-white dark:bg-black border-gray-200 dark:border-gray-800 max-w-md">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-black dark:text-white text-lg font-medium">API Configuration</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <Alert
-                  className={`${
-                    apiMode === "user"
-                      ? "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/50 dark:text-blue-100"
-                      : "border-green-500 bg-green-50 text-green-900 dark:border-green-400 dark:bg-green-950/50 dark:text-green-100"
-                  } shadow-sm`}
-                >
-                  <AlertDescription className="font-medium">
-                    {apiMode === "user"
-                      ? "Using your TwelveLabs API key for personalized content."
-                      : "Using default API configuration with environment variables."}
-                  </AlertDescription>
-                </Alert>
-
-                {!isApiConnected && (
-                  <>
-                    <Input
-                      type="password"
-                      placeholder="Enter your TwelveLabs API key"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      disabled={isConnecting}
-                      className="bg-background border-border"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Connect your TwelveLabs API key to access your personal content and indexes.
+              
+              <div className="space-y-6">
+                {/* Current Status */}
+                <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+                  <div className={`w-3 h-3 rounded-full ${apiMode === "user" ? "bg-black dark:bg-white" : "bg-gray-400 dark:bg-gray-600"}`}></div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-black dark:text-white">
+                      {apiMode === "user" ? "User API Mode" : "Default Mode"}
                     </p>
-                  </>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {apiMode === "user" 
+                        ? "Using your personal API key" 
+                        : "Using environment configuration"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* API Key Input */}
+                {!isApiConnected && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-black dark:text-white block mb-2">
+                        TwelveLabs API Key
+                      </label>
+                      <Input
+                        type="password"
+                        placeholder="tl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                        value={apiKey}
+                        onChange={(e) => setApiKey(e.target.value)}
+                        disabled={isConnecting}
+                        className="bg-white dark:bg-black border-gray-300 dark:border-gray-700 text-black dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:border-black dark:focus:border-white"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Get your API key from{" "}
+                      <a 
+                        href="https://twelvelabs.io" 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-black dark:text-white underline hover:no-underline"
+                      >
+                        twelvelabs.io
+                      </a>
+                    </p>
+                  </div>
                 )}
 
-                <div className="flex justify-end gap-2">
-                  {isApiConnected && (
-                    <Button
-                      variant="outline"
-                      onClick={handleSwitchToDefault}
-                      disabled={isConnecting}
-                      className="border-border bg-transparent"
-                    >
-                      Switch to Default
-                    </Button>
-                  )}
-                  {!isApiConnected && (
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  {!isApiConnected ? (
                     <>
                       <Button
                         variant="outline"
                         onClick={() => setIsDialogOpen(false)}
                         disabled={isConnecting}
-                        className="border-border"
+                        className="border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900"
                       >
                         Cancel
                       </Button>
                       <Button
                         onClick={handleApiConnect}
                         disabled={isConnecting || !apiKey.trim()}
-                        className="bg-primary hover:bg-primary/90"
+                        className="bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 disabled:bg-gray-300 dark:disabled:bg-gray-700"
                       >
                         {isConnecting ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                            Connecting...
+                            Connecting
                           </>
                         ) : (
-                          "Connect TwelveLabs API KEY"
+                          "Connect"
                         )}
                       </Button>
                     </>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsDialogOpen(false)}
+                      disabled={isConnecting}
+                      className="border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900"
+                    >
+                      Close
+                    </Button>
                   )}
                 </div>
               </div>
@@ -1482,10 +1522,10 @@ export function ModelEvaluationPlatform() {
           <Alert
             className={`${
               alert.type === "error"
-                ? "border-red-500 bg-red-50 text-red-900 dark:border-red-400 dark:bg-red-950/50 dark:text-red-100"
+                ? "border-gray-800 dark:border-gray-200 bg-gray-100 dark:bg-gray-900 text-black dark:text-white"
                 : alert.type === "success"
-                  ? "border-green-500 bg-green-50 text-green-900 dark:border-green-400 dark:bg-green-950/50 dark:text-green-100"
-                  : "border-blue-500 bg-blue-50 text-blue-900 dark:border-blue-400 dark:bg-blue-950/50 dark:text-blue-100"
+                  ? "border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-black dark:text-white"
+                  : "border-gray-400 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-black dark:text-white"
             } shadow-sm`}
           >
             <AlertDescription className="font-medium">{alert.message}</AlertDescription>
@@ -1496,7 +1536,7 @@ export function ModelEvaluationPlatform() {
       {/* API Error Alert */}
       {apiError && (
         <div className="px-6 py-2">
-          <Alert className="border-red-500 bg-red-50 text-red-900 dark:border-red-400 dark:bg-red-950/50 dark:text-red-100 shadow-sm">
+          <Alert className="border-gray-800 dark:border-gray-200 bg-gray-100 dark:bg-gray-900 text-black dark:text-white shadow-sm">
             <AlertDescription className="font-medium">
               API Error: {apiError}
             </AlertDescription>

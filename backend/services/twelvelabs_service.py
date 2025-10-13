@@ -204,7 +204,7 @@ class TwelveLabsService:
             }
             
             # Current TwelveLabs API endpoint for text generation
-            url = "https://api.twelvelabs.io/v1.3/generate"
+            url = "https://api.twelvelabs.io/v1.3/analyze"
             payload = {
                 "video_id": video_id,
                 "prompt": enhanced_prompt

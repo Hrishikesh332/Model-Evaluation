@@ -1,4 +1,5 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "/api"
+const NEXT_API_BASE_URL = "/api" // Always use Next.js API routes for client-side operations
 
 export interface ApiResponse<T> {
   status: "success" | "error"
@@ -87,19 +88,78 @@ class ApiService {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        ...options?.headers,
+        ...(options?.headers as Record<string, string>),
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      // Add API key headers if available from cookies
+      if (typeof document !== 'undefined') {
+        const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+          const [key, value] = cookie.trim().split('=')
+          acc[key] = value
+          return acc
+        }, {} as Record<string, string>)
+
+        if (cookies.twelvelabs_api_key) {
+          headers['X-TwelveLabs-API-Key'] = cookies.twelvelabs_api_key
+        }
+        if (cookies.gemini_api_key) {
+          headers['X-Gemini-API-Key'] = cookies.gemini_api_key
+        }
+        if (cookies.openai_api_key) {
+          headers['X-OpenAI-API-Key'] = cookies.openai_api_key
+        }
+      }
+
+      const url = `${API_BASE_URL}${endpoint}`
+      console.log(`Making API request to: ${url}`)
+      
+      const response = await fetch(url, {
         headers,
         ...options,
       })
 
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`API request failed: ${response.status} ${response.statusText}`, errorText)
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
+      }
+
       const data = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`)
+      if (data.status === "error") {
+        throw new Error(data.message || "API request failed")
       }
+
+      return data
+    } catch (error) {
+      console.error(`API request failed for ${endpoint}:`, error)
+      throw error
+    }
+  }
+
+  // Helper method for requests with custom base URL
+  private async requestWithBaseUrl<T>(baseUrl: string, endpoint: string, options?: RequestInit): Promise<T> {
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options?.headers as Record<string, string>),
+      }
+
+      const url = `${baseUrl}${endpoint}`
+      console.log(`Making API request to: ${url}`)
+      
+      const response = await fetch(url, {
+        headers,
+        ...options,
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`API request failed: ${response.status} ${response.statusText}`, errorText)
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
 
       if (data.status === "error") {
         throw new Error(data.message || "API request failed")
@@ -114,19 +174,16 @@ class ApiService {
 
   // Authentication
   async connectApiKey(type: "twelvelabs" | "gemini" | "openai", apiKey: string) {
-    return this.request("/connect", {
+    return this.requestWithBaseUrl(NEXT_API_BASE_URL, "/connect", {
       method: "POST",
       body: JSON.stringify({ type, api_key: apiKey }),
     })
   }
 
-  async checkApiKeyStatus(): Promise<{ connected: boolean; type?: string; source?: string; message?: string }> {
-    return this.request("/status")
-  }
 
   // Video Management
   async getIndexes(): Promise<{ indexes: Index[]; source?: string; message?: string }> {
-    const response = await this.request(`/api/indexes?t=${Date.now()}`)
+    const response = await this.requestWithBaseUrl(NEXT_API_BASE_URL, `/indexes?t=${Date.now()}`) as any
     console.log("getIndexes raw response:", response)
 
     // Handle different response formats from the API
@@ -143,7 +200,7 @@ class ApiService {
   }
 
   async getVideos(indexId: string): Promise<{ videos: Video[]; source?: string; message?: string }> {
-    const response = await this.request(`/api/indexes/${indexId}/videos?t=${Date.now()}`)
+    const response = await this.requestWithBaseUrl(NEXT_API_BASE_URL, `/indexes/${indexId}/videos?t=${Date.now()}`) as any
     console.log("getVideos raw response:", response)
 
     // Handle different response formats from the API
@@ -160,7 +217,7 @@ class ApiService {
   }
 
   async selectVideo(indexId: string, videoId: string) {
-    return this.request("/api/video/select", {
+    return this.requestWithBaseUrl(NEXT_API_BASE_URL, "/video/select", {
       method: "POST",
       body: JSON.stringify({ index_id: indexId, video_id: videoId }),
     })
@@ -168,7 +225,7 @@ class ApiService {
 
   // Model Management
   async getModels(): Promise<{ models: ModelStatus; source?: string; message?: string }> {
-    return this.request("/api/models")
+    return this.requestWithBaseUrl(NEXT_API_BASE_URL, "/models")
   }
 
   // Search and Analysis
@@ -182,9 +239,9 @@ class ApiService {
     onStreamUpdate?: (text: string, modelName: string, performanceData?: any) => void,
     onStreamComplete?: (modelName: string, finalPerformanceData?: any) => void,
   ): Promise<SearchResponse | StreamingResponse> {
-    // Try streaming endpoint first
+    // Try streaming endpoint first - use Next.js API route to ensure user API keys are passed
     try {
-      const streamResponse = await fetch(`${API_BASE_URL}/api/analyze/stream`, {
+      const streamResponse = await fetch(`${NEXT_API_BASE_URL}/analyze/stream`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -202,14 +259,14 @@ class ApiService {
 
       if (streamResponse.ok && streamResponse.headers.get("content-type")?.includes("text/event-stream")) {
         console.log("Using streaming endpoint")
-        return this.handleStreamingResponse(streamResponse, onStreamUpdate)
+        return this.handleStreamingResponse(streamResponse, onStreamUpdate, onStreamComplete)
       }
     } catch (error) {
       console.log("Streaming endpoint failed, falling back to regular endpoint:", error)
     }
 
-    // Fallback to regular endpoint
-    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+    // Fallback to regular endpoint - use Next.js API route to ensure user API keys are passed
+    const response = await fetch(`${NEXT_API_BASE_URL}/analyze`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -234,7 +291,7 @@ class ApiService {
     const contentType = response.headers.get("content-type")
     if (contentType && contentType.includes("text/event-stream")) {
               console.log("Regular endpoint returned streaming response")
-      return this.handleStreamingResponse(response, onStreamUpdate)
+      return this.handleStreamingResponse(response, onStreamUpdate, onStreamComplete)
     } else {
               console.log("Using regular JSON response")
       const data = await response.json()
@@ -297,6 +354,7 @@ class ApiService {
   private async handleStreamingResponse(
     response: Response,
     onStreamUpdate?: (text: string, modelName: string, performanceData?: any) => void,
+    onStreamComplete?: (modelName: string, finalPerformanceData?: any) => void,
   ): Promise<StreamingResponse> {
     return new Promise((resolve, reject) => {
       const reader = response.body?.getReader()
@@ -313,7 +371,7 @@ class ApiService {
       let isComplete = false
 
       function processStream() {
-        reader
+        reader!
           .read()
           .then(({ done, value }) => {
             if (done) {
@@ -464,7 +522,7 @@ class ApiService {
       const completedModels = new Set<string>()
 
       function processStream() {
-        reader
+        reader!
           .read()
           .then(({ done, value }) => {
             if (done) {
@@ -652,13 +710,13 @@ class ApiService {
 
   // API Key Management
   async disconnectApiKey() {
-    return this.request("/api/disconnect", {
+    return this.requestWithBaseUrl(NEXT_API_BASE_URL, "/disconnect", {
       method: "POST",
     })
   }
 
-  async checkApiKeyStatus(): Promise<{ connected: boolean; type?: string }> {
-    return this.request("/api/status")
+  async checkApiKeyStatus(): Promise<{ connected: boolean; type?: string; source?: string }> {
+    return this.requestWithBaseUrl(NEXT_API_BASE_URL, "/status")
   }
 
   // Performance and Stats

@@ -5,53 +5,47 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies()
-    const apiMode = cookieStore.get('api_mode')?.value
-    const twelvelabsApiKey = cookieStore.get('twelvelabs_api_key')?.value
-
-    console.log("[v0] Video Select API - API Mode:", apiMode)
-    console.log("[v0] Video Select API - User API Key present:", !!twelvelabsApiKey)
-
+    const cookieStore = await cookies()
     const body = await request.json()
+    
+    // Check if we have API keys in cookies (user mode)
+    const twelvelabsKey = cookieStore.get('twelvelabs_api_key')?.value
+    const apiMode = cookieStore.get('api_mode')?.value
 
-    // Determine the source of the API key
-    let source = "environment"
-    if (apiMode === "user" && twelvelabsApiKey) {
-      source = "user_session"
+    // If we have user API keys, proxy to backend with those keys
+    if (apiMode === 'user' && twelvelabsKey) {
+      const response = await fetch(`${API_BASE_URL}/api/video/select`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TwelveLabs-API-Key': twelvelabsKey,
+        },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Backend responded with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return NextResponse.json(data)
     }
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-
-    // If user has provided an API key, include it in the request
-    if (source === "user_session" && twelvelabsApiKey) {
-      headers["X-API-Key"] = twelvelabsApiKey
-      console.log("[v0] Video Select API - Using user-provided API key")
-    } else {
-      console.log("[v0] Video Select API - Using environment API key")
-    }
-
+    // If no user keys, check environment mode
     const response = await fetch(`${API_BASE_URL}/api/video/select`, {
-      method: "POST",
-      headers,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(body),
     })
 
     if (!response.ok) {
-      throw new Error(`API responded with status: ${response.status}`)
+      throw new Error(`Backend responded with status: ${response.status}`)
     }
 
     const data = await response.json()
-    
-    // Add source information to the response
-    const responseData = {
-      ...data,
-      source,
-      message: source === "user_session" ? "Using user API key" : "Using environment API key"
-    }
-    
-    return NextResponse.json(responseData)
+    return NextResponse.json(data)
   } catch (error) {
     console.error("Failed to select video:", error)
     return NextResponse.json({ 

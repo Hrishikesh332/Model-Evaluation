@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store the API key in a secure cookie for this session
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const response = NextResponse.json({
       status: "success",
       message: "API key connected successfully",

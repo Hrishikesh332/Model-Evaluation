@@ -5,55 +5,49 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
+    
+    // Check if we have API keys in cookies (user mode)
+    const twelvelabsKey = cookieStore.get('twelvelabs_api_key')?.value
     const apiMode = cookieStore.get('api_mode')?.value
-    const twelvelabsApiKey = cookieStore.get('twelvelabs_api_key')?.value
 
-    console.log("Models API - API Mode:", apiMode)
-    console.log("Models API - User API Key present:", !!twelvelabsApiKey)
+    // If we have user API keys, proxy to backend with those keys
+    if (apiMode === 'user' && twelvelabsKey) {
+      const response = await fetch(`${API_BASE_URL}/api/models`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-TwelveLabs-API-Key': twelvelabsKey,
+        },
+      })
 
-    // Determine the source of the API key
-    let source = "environment"
-    if (apiMode === "user" && twelvelabsApiKey) {
-      source = "user_session"
+      if (!response.ok) {
+        throw new Error(`Backend responded with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return NextResponse.json(data)
     }
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-
-    // If user has provided an API key, include it in the request
-    if (source === "user_session" && twelvelabsApiKey) {
-      headers["X-API-Key"] = twelvelabsApiKey
-      console.log("Models API - Using user-provided API key")
-    } else {
-      console.log("Models API - Using environment API key")
-    }
-
+    // If no user keys, check environment mode
     const response = await fetch(`${API_BASE_URL}/api/models`, {
-      method: "GET",
-      headers,
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     })
 
     if (!response.ok) {
-      throw new Error(`API responded with status: ${response.status}`)
+      throw new Error(`Backend responded with status: ${response.status}`)
     }
 
     const data = await response.json()
-    
-    // Add source information to the response
-    const responseData = {
-      ...data,
-      source,
-      message: source === "user_session" ? "Using user API key" : "Using environment API key"
-    }
-    
-    return NextResponse.json(responseData)
+    return NextResponse.json(data)
   } catch (error) {
-    console.error("Failed to fetch models:", error)
+    console.error("Failed to get models:", error)
     return NextResponse.json({ 
       status: "error",
-      message: "Failed to fetch models",
+      message: "Failed to get models",
       error: error instanceof Error ? error.message : "Unknown error"
     }, { status: 500 })
   }

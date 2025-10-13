@@ -173,11 +173,22 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
     @api.route('/status', methods=['GET'])
     def get_api_status():
         """Get current API key status and source"""
+        # Check for API key in headers (from frontend proxy)
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        
+        # Determine if we're using user session or environment
+        user_session_key = session.get('twelvelabs_api_key')
+        environment_key = Config.TWELVELABS_API_KEY
+        
+        # Use header key if provided, otherwise fall back to session, then environment
+        active_key = twelvelabs_header_key or user_session_key or environment_key
+        key_source = "user_session" if (twelvelabs_header_key or user_session_key) else "environment"
+        
         status = {
             "twelvelabs": {
-                "connected": bool(session.get('twelvelabs_api_key')),
-                "source": "user_session" if session.get('twelvelabs_api_key') else "environment",
-                "has_key": bool(get_api_key('twelvelabs')),
+                "connected": bool(active_key),
+                "source": key_source,
+                "has_key": bool(active_key),
                 "user_manageable": True
             },
             "gemini": {
@@ -197,7 +208,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         return jsonify({
             "status": "success",
             "api_status": status,
-            "message": "Current API key status retrieved. Only TwelveLabs can be user-managed.",
+            "message": f"Current API key status retrieved. Using {key_source} configuration.",
             "restrictions": {
                 "user_manageable": ["twelvelabs"],
                 "environment_only": ["gemini", "openai"]
@@ -210,9 +221,12 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             response = make_response()
             return add_cors_headers(response)
         
-        # Get API key using helper function (session first, then environment)
-        api_key = get_api_key('twelvelabs')
-        source = "user_session" if session.get('twelvelabs_api_key') else "environment"
+        # Check for API key in headers (from frontend proxy)
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        
+        # Get API key using priority: header > session > environment
+        api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        source = "user_session" if (twelvelabs_header_key or session.get('twelvelabs_api_key')) else "environment"
         
         print(f"🔑 API Key Source: {source}")
         print(f"🔑 Using API Key: {api_key[:10]}..." if api_key else "🔑 No API key available")
@@ -246,9 +260,12 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             response = make_response()
             return add_cors_headers(response)
         
-        # Get API key using helper function (session first, then environment)
-        api_key = get_api_key('twelvelabs')
-        source = "user_session" if session.get('twelvelabs_api_key') else "environment"
+        # Check for API key in headers (from frontend proxy)
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        
+        # Get API key using priority: header > session > environment
+        api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        source = "user_session" if (twelvelabs_header_key or session.get('twelvelabs_api_key')) else "environment"
         
         print(f"🎬 Getting videos for index {index_id} using {source} API key")
         
@@ -295,8 +312,12 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if not index_id or not video_id:
             return jsonify({"status": "error", "message": "Index ID and Video ID are required"}), 400
         
-        # Get API key using helper function (session first, then environment)
-        api_key = get_api_key('twelvelabs')
+        # Check for API key in headers (from frontend proxy)
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        
+        # Get API key using priority: header > session > environment
+        api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        source = "user_session" if (twelvelabs_header_key or session.get('twelvelabs_api_key')) else "environment"
         
         session['selected_index_id'] = index_id
         session['selected_video_id'] = video_id
@@ -320,7 +341,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                     "message": result["message"],
                     "video_id": video_id,
                     "video_path": result["video_path"],
-                    "source": "session" if session.get('twelvelabs_api_key') else "environment"
+                    "source": source
                 })
             else:
                 return jsonify({"status": "error", "message": result["error"]}), 500

@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 
 export async function POST() {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     
     // Clear all API key related cookies
     cookieStore.delete("twelvelabs_api_key")
