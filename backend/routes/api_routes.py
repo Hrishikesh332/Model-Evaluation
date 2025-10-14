@@ -381,6 +381,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if not query:
             return jsonify({"status": "error", "message": "No query provided"}), 400
         
+        # Check for API keys in headers (from frontend proxy) - PRIORITY: header > session > environment
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        gemini_header_key = request.headers.get('X-Gemini-API-Key')
+        openai_header_key = request.headers.get('X-OpenAI-API-Key')
+        
         # Get video info from request body first, then fall back to session
         index_id = request.json.get('index_id') or session.get('selected_index_id')
         video_id = request.json.get('video_id') or session.get('selected_video_id')
@@ -390,6 +395,12 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         print(f"Session data - index_id: {session.get('selected_index_id')}, video_id: {session.get('selected_video_id')}")
         print(f"Processing query: '{query}' for video_id: {video_id} with model: {selected_model}")
         print(f"Execution mode: {execution_mode}, Compare models: {compare_models}")
+        
+        # Log API key sources for debugging
+        twelvelabs_key_source = "header" if twelvelabs_header_key else ("session" if session.get('twelvelabs_api_key') else "environment")
+        gemini_key_source = "header" if gemini_header_key else ("session" if session.get('gemini_api_key') else "environment")
+        openai_key_source = "header" if openai_header_key else ("session" if session.get('openai_api_key') else "environment")
+        print(f"🔑 API Key Sources - TwelveLabs: {twelvelabs_key_source}, Gemini: {gemini_key_source}, OpenAI: {openai_key_source}")
         
         if not index_id or not video_id:
             # Try to get the last known video from session as fallback
@@ -423,15 +434,59 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                     }
                 }), 400
         
-        api_key = session.get('gemini_api_key', Config.GEMINI_API_KEY)
+        # Check if we're using user API key but trying to access default account data
+        if twelvelabs_header_key or session.get('twelvelabs_api_key'):
+            # User is using their own API key
+            user_mode = True
+            print(f"🔑 User API mode detected - using user's API key")
+        else:
+            # Using environment/default API key
+            user_mode = False
+            print(f"🔑 Default API mode detected - using environment API key")
+        
+        # Validate that the video belongs to the current API key's account
+        # This is a safety check to prevent 403 errors
+        try:
+            if user_mode:
+                # For user mode, we should validate the video exists in their account
+                temp_service = TwelveLabsService(twelvelabs_header_key or session.get('twelvelabs_api_key'))
+                # Try to get video details to validate access
+                try:
+                    # This will fail with 403 if the video doesn't belong to the user's account
+                    video_info = temp_service.get_video_details(index_id, video_id)
+                    print(f"✅ Video {video_id} validated for user account")
+                except Exception as e:
+                    if "403" in str(e) or "not authorized" in str(e).lower():
+                        return jsonify({
+                            "status": "error",
+                            "message": "Video access denied. This video belongs to a different account. Please select a video from your own account.",
+                            "error_type": "video_access_denied",
+                            "help": {
+                                "issue": "You're using your personal API key, but trying to access a video from the default account",
+                                "solution": "Please select a video from your own indexes, or switch back to default mode",
+                                "video_id": video_id,
+                                "index_id": index_id
+                            }
+                        }), 403
+                    else:
+                        # Other errors, let it proceed and fail naturally
+                        print(f"⚠️ Video validation failed with non-403 error: {e}")
+            else:
+                print(f"✅ Using default API key - no additional validation needed")
+        except Exception as e:
+            print(f"⚠️ Video validation check failed: {e}")
+            # Continue with the request - let it fail naturally if there are issues
+        
+        # Update API keys using priority: header > session > environment
+        api_key = gemini_header_key or session.get('gemini_api_key') or Config.GEMINI_API_KEY
         if api_key:
             gemini_model.update_api_key(api_key)
         
-        api_key = session.get('openai_api_key', Config.OPENAI_API_KEY)
+        api_key = openai_header_key or session.get('openai_api_key') or Config.OPENAI_API_KEY
         if api_key:
             openai_model.update_api_key(api_key)
         
-        api_key = session.get('twelvelabs_api_key', Config.TWELVELABS_API_KEY)
+        api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         if api_key:
             twelvelabs_service.update_api_key(api_key)
         
@@ -503,6 +558,11 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         import json
         import time
         
+        # Check for API keys in headers (from frontend proxy) - PRIORITY: header > session > environment
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        gemini_header_key = request.headers.get('X-Gemini-API-Key')
+        openai_header_key = request.headers.get('X-OpenAI-API-Key')
+        
         query = request.json.get('query')
         selected_model = request.json.get('model', 'gemini')
         index_id = request.json.get('index_id') or session.get('selected_index_id')
@@ -511,6 +571,36 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         
         if not query or not index_id or not video_id:
             return jsonify({"status": "error", "message": "Missing required parameters"}), 400
+        
+        # Check if we're using user API key but trying to access default account data
+        if twelvelabs_header_key or session.get('twelvelabs_api_key'):
+            # User is using their own API key - validate video access
+            try:
+                temp_service = TwelveLabsService(twelvelabs_header_key or session.get('twelvelabs_api_key'))
+                temp_service.get_video_details(index_id, video_id)
+                print(f"✅ Video {video_id} validated for user account (streaming)")
+            except Exception as e:
+                if "403" in str(e) or "not authorized" in str(e).lower():
+                    return jsonify({
+                        "status": "error",
+                        "message": "Video access denied. This video belongs to a different account. Please select a video from your own account.",
+                        "error_type": "video_access_denied"
+                    }), 403
+                else:
+                    print(f"⚠️ Video validation failed with non-403 error: {e}")
+        
+        # Update API keys using priority: header > session > environment
+        api_key = gemini_header_key or session.get('gemini_api_key') or Config.GEMINI_API_KEY
+        if api_key:
+            gemini_model.update_api_key(api_key)
+        
+        api_key = openai_header_key or session.get('openai_api_key') or Config.OPENAI_API_KEY
+        if api_key:
+            openai_model.update_api_key(api_key)
+        
+        api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+        if api_key:
+            twelvelabs_service.update_api_key(api_key)
         
         def generate_stream():
             """Generate streaming response"""
@@ -625,11 +715,23 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         from concurrent.futures import ThreadPoolExecutor
         from queue import Queue, Empty
         
+        # Check for API keys in headers (from frontend proxy) - PRIORITY: header > session > environment
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        gemini_header_key = request.headers.get('X-Gemini-API-Key')
+        openai_header_key = request.headers.get('X-OpenAI-API-Key')
+        
         query = request.json.get('query')
         models_to_run = request.json.get('models', ['gemini', 'pegasus'])  # Can specify multiple models
         index_id = request.json.get('index_id') or session.get('selected_index_id')
         video_id = request.json.get('video_id') or session.get('selected_video_id')
         video_path = request.json.get('video_path') or session.get('video_path')
+        
+        # Store API keys for use in threads (since session is not accessible in threads)
+        user_api_keys = {
+            'twelvelabs': twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY,
+            'gemini': gemini_header_key or session.get('gemini_api_key') or Config.GEMINI_API_KEY,
+            'openai': openai_header_key or session.get('openai_api_key') or Config.OPENAI_API_KEY
+        }
         
         # If video_path is not provided, try to get it from video service
         if not video_path and video_id:
@@ -646,6 +748,23 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         
         if not query or not index_id or not video_id or not video_path:
             return jsonify({"status": "error", "message": "Missing required parameters or video file not found"}), 400
+        
+        # Check if we're using user API key but trying to access default account data
+        if twelvelabs_header_key or session.get('twelvelabs_api_key'):
+            # User is using their own API key - validate video access
+            try:
+                temp_service = TwelveLabsService(twelvelabs_header_key or session.get('twelvelabs_api_key'))
+                temp_service.get_video_details(index_id, video_id)
+                print(f"✅ Video {video_id} validated for user account (parallel streaming)")
+            except Exception as e:
+                if "403" in str(e) or "not authorized" in str(e).lower():
+                    return jsonify({
+                        "status": "error",
+                        "message": "Video access denied. This video belongs to a different account. Please select a video from your own account.",
+                        "error_type": "video_access_denied"
+                    }), 403
+                else:
+                    print(f"⚠️ Video validation failed with non-403 error: {e}")
         
         def generate_parallel_stream():
             """Generate parallel streaming response"""
@@ -710,41 +829,54 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                         # Run the actual analysis
                         print(f"⚡ Running {model_name} analysis...")
                         if model_name == 'gemini':
-                            # Use environment API key for Gemini (no session access in threads)
-                            api_key = Config.GEMINI_API_KEY
+                            # Use user API key (header > session > environment)
+                            api_key = user_api_keys['gemini']
                             if api_key:
                                 gemini_model.update_api_key(api_key)
                                 response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
                             else:
                                 response = "Error: No Gemini API key available"
                         elif model_name == 'gemini-2.0-flash':
-                            # Use environment API key for Gemini (no session access in threads)
-                            api_key = Config.GEMINI_API_KEY
+                            # Use user API key (header > session > environment)
+                            api_key = user_api_keys['gemini']
                             if api_key:
                                 gemini_model.update_api_key(api_key)
                                 response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
                             else:
                                 response = "Error: No Gemini API key available"
                         elif model_name == 'gemini-2.5-pro':
-                            # Use environment API key for Gemini (no session access in threads)
-                            api_key = Config.GEMINI_API_KEY
+                            # Use user API key (header > session > environment)
+                            api_key = user_api_keys['gemini']
                             if api_key:
                                 gemini_model.update_api_key(api_key)
                                 response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro", cache_manager)
                             else:
                                 response = "Error: No Gemini API key available"
                         elif model_name == 'pegasus' or model_name == 'pegasus-1.2':
-                            # Use environment API key for TwelveLabs (no session access in threads)
-                            api_key = Config.TWELVELABS_API_KEY
+                            # Use user API key (header > session > environment)
+                            api_key = user_api_keys['twelvelabs']
                             if api_key:
                                 # Create a temporary service instance for this request to avoid conflicts
                                 temp_service = TwelveLabsService(api_key)
-                                response = temp_service.generate_response(video_id, query, index_id)
+                                
+                                # Validate video access before making the API call
+                                try:
+                                    temp_service.get_video_details(index_id, video_id)
+                                    print(f"✅ Video {video_id} validated for user account in parallel streaming")
+                                    response = temp_service.generate_response(video_id, query, index_id)
+                                except Exception as e:
+                                    if "403" in str(e) or "not authorized" in str(e).lower():
+                                        response = f"Error: Video access denied. This video belongs to a different account. Please select a video from your own account. (Video ID: {video_id})"
+                                        print(f"❌ Video access denied for {video_id}: {e}")
+                                    else:
+                                        print(f"⚠️ Video validation failed with non-403 error: {e}")
+                                        # Continue with the API call anyway
+                                        response = temp_service.generate_response(video_id, query, index_id)
                             else:
                                 response = "Error: No TwelveLabs API key available"
                         elif model_name == 'gpt4o':
-                            # Use environment API key for OpenAI (no session access in threads)
-                            api_key = Config.OPENAI_API_KEY
+                            # Use user API key (header > session > environment)
+                            api_key = user_api_keys['openai']
                             if api_key:
                                 openai_model.update_api_key(api_key)
                                 response = openai_model.generate_response(query, video_path, cache_manager)
@@ -1148,7 +1280,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
     def refresh_data():
         """Force refresh all data with current API key"""
         try:
-            api_key = session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
+            # Check for API key in headers (from frontend proxy) - PRIORITY: header > session > environment
+            twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+            api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
             
             if not api_key:
                 return jsonify({
@@ -1299,7 +1433,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
 
     @api.route('/thumbnails/<index_id>/<video_id>')
     def get_video_thumbnail(index_id, video_id):
-        api_key = session.get('twelvelabs_api_key', Config.TWELVELABS_API_KEY)
+        # Check for API key in headers (from frontend proxy) - PRIORITY: header > session > environment
+        twelvelabs_header_key = request.headers.get('X-TwelveLabs-API-Key')
+        api_key = twelvelabs_header_key or session.get('twelvelabs_api_key') or Config.TWELVELABS_API_KEY
         
         if not api_key:
             print("No API key available for thumbnail")

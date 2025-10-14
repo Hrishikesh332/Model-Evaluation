@@ -1032,9 +1032,24 @@ export function ModelEvaluationPlatform() {
     } catch (error) {
       console.error("[v0] Error in parallel analysis:", error)
       
+      // Check if this is a video access denied error
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      if (errorMessage.includes("Video access denied") || errorMessage.includes("not authorized")) {
+        showAlert(
+          "🚫 Video Access Denied: This video belongs to a different account. Please select a video from your own account or switch back to default mode.",
+          "error"
+        )
+        
+        // Clear the current selection to force user to select a new video
+        setSelectedVideo(null)
+        setVideos([])
+      } else {
+        showAlert(`❌ Analysis failed: ${errorMessage}`, "error")
+      }
+      
       // Handle errors for both compartments
       const errorResponse = {
-        response: `Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
+        response: `Error: ${errorMessage}`,
         model: "error",
         timestamp: new Date(),
         isLoading: false,
@@ -1440,6 +1455,11 @@ export function ModelEvaluationPlatform() {
                         : "Using environment configuration"}
                     </p>
                   </div>
+                  {apiMode === "user" && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      ✓ Connected
+                    </div>
+                  )}
                 </div>
 
                 {/* API Key Input */}
@@ -1500,14 +1520,31 @@ export function ModelEvaluationPlatform() {
                       </Button>
                     </>
                   ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsDialogOpen(false)}
-                      disabled={isConnecting}
-                      className="border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900"
-                    >
-                      Close
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={handleSwitchToDefault}
+                        disabled={isConnecting}
+                        className="border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900"
+                      >
+                        {isConnecting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            Switching...
+                          </>
+                        ) : (
+                          "Default Mode"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsDialogOpen(false)}
+                        disabled={isConnecting}
+                        className="border-gray-300 dark:border-gray-700 bg-white dark:bg-black text-black dark:text-white hover:bg-gray-50 dark:hover:bg-gray-900"
+                      >
+                        Close
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>

@@ -108,7 +108,7 @@ class TwelveLabsService:
     def get_video_details(self, index_id, video_id):
 
         if not self.api_key:
-            return None
+            raise Exception("No API key available")
             
         url = f"https://api.twelvelabs.io/v1.3/indexes/{index_id}/videos/{video_id}?embed=false"
         headers = {
@@ -122,10 +122,12 @@ class TwelveLabsService:
                 return response.json()
             else:
                 print(f"Failed to get video details: Status {response.status_code}")
-                return None
+                print(f"Response: {response.text}")
+                # Raise an exception with the status code for proper error handling
+                raise Exception(f"API request failed with status {response.status_code}: {response.text}")
         except Exception as e:
             print(f"Exception getting video details: {str(e)}")
-            return None
+            raise e
 
     def get_video_url(self, index_id, video_id):
 

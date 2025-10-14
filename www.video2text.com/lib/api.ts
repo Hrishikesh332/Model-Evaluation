@@ -313,11 +313,11 @@ class ApiService {
     onStreamComplete?: (modelName: string, finalPerformanceData?: any) => void,
   ): Promise<SearchResponse | StreamingResponse> {
     console.log("analyzeVideoParallel called with models:", models)
-    console.log("Attempting parallel streaming endpoint:", `${API_BASE_URL}/api/analyze/stream/parallel`)
+    console.log("Attempting parallel streaming endpoint via Next.js API route:", `${NEXT_API_BASE_URL}/analyze/stream/parallel`)
 
-    // Try parallel streaming endpoint first
+    // Try parallel streaming endpoint via Next.js API route (which handles user API keys)
     try {
-      const streamResponse = await fetch(`${API_BASE_URL}/api/analyze/stream/parallel`, {
+      const streamResponse = await fetch(`${NEXT_API_BASE_URL}/analyze/stream/parallel`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
