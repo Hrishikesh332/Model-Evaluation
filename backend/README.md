@@ -18,9 +18,10 @@ For support or to join the conversation, visit our [Discord](https://discord.com
 | Model Name                         | Available ✅ |
 |-----------------------------------|--------------|
 | `pegasus-1.2`                     | ✅           |
-| `gemini-2.5-pro-exp-03-25`   | ✅           |
-| `gemini-1.5-pro`                 | ✅           |
+| `gemini-2.5-pro`   | ✅           |
+| `gemini-2.0-flash`                 | ✅           |
 | `gpt-4o`                         | ✅           |
+| `nova1.0lite`                         | ✅           |
 
 
 ## Prerequisites
