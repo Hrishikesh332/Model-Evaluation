@@ -358,7 +358,8 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             "pegasus-1.2": bool(get_api_key('twelvelabs')),
             "gemini-2.0-flash": bool(get_api_key('gemini')),
             "gemini-2.5-pro": bool(get_api_key('gemini')),
-            "gpt4o": bool(get_api_key('openai'))
+            "gpt4o": bool(get_api_key('openai')),
+            "nova": nova_model.is_available()
         }
         
         return jsonify({

@@ -410,8 +410,10 @@ export function ModelEvaluationPlatform() {
 
         if (modelsResponse.models["gemini-2.0-flash"]) setLeftModel("gemini-2.0-flash")
         else if (modelsResponse.models["gemini-2.5-pro"]) setLeftModel("gemini-2.5-pro")
+        else if (modelsResponse.models.nova) setLeftModel("nova")
 
         if (modelsResponse.models["pegasus-1.2"]) setRightModel("pegasus-1.2")
+        else if (modelsResponse.models.nova) setRightModel("nova")
 
         const statusMessage = apiMode === "user" 
           ? "Connected using user API key" 
@@ -1107,6 +1109,7 @@ export function ModelEvaluationPlatform() {
     if (availableModels["gemini-2.5-pro"])
       models.push({ value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" })
     if (availableModels.gpt4o) models.push({ value: "gpt4o", label: "GPT-4o", provider: "OpenAI" })
+    if (availableModels.nova) models.push({ value: "nova", label: "AWS Nova", provider: "Amazon" })
     return models
   }
 
@@ -1115,6 +1118,8 @@ export function ModelEvaluationPlatform() {
     const models = []
     if (availableModels["pegasus-1.2"])
       models.push({ value: "pegasus-1.2", label: "Pegasus 1.2", provider: "TwelveLabs" })
+    if (availableModels.nova)
+      models.push({ value: "nova", label: "AWS Nova", provider: "Amazon" })
     return models
   }
 

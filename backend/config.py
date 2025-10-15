@@ -15,6 +15,11 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     TWELVELABS_API_KEY = os.getenv("TWELVELABS_API_KEY")
     
+    # AWS Configuration for Nova
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+    
     APP_URL = os.getenv('APP_URL')
     
     GEMINI_GENERATION_CONFIG = {

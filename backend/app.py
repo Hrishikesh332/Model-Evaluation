@@ -294,11 +294,12 @@ def create_app():
                     "cache_manager": "ok",
                     "performance_monitor": "ok",
                     "scheduler": scheduler.running if scheduler else False,
-                    "models": {
-                        "gemini": bool(gemini_model.api_key),
-                        "openai": bool(openai_model.api_key),
-                        "twelvelabs": bool(twelvelabs_service.api_key)
-                    }
+                "models": {
+                    "gemini": bool(gemini_model.api_key),
+                    "openai": bool(openai_model.api_key),
+                    "twelvelabs": bool(twelvelabs_service.api_key),
+                    "nova": nova_model.is_available()
+                }
                 },
                 "statistics": {
                     "total_comparisons": len(performance_monitor.execution_history),
