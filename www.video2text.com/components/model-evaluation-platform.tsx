@@ -366,28 +366,22 @@ export function ModelEvaluationPlatform() {
   // Tutorial steps data
   const tutorialSteps = [
     {
-      title: "Welcome to Model Evaluation Platform",
+      title: "Introducing Video to Text Arena",
       description:
-        "Search, Analyze, and Embed are now available directly within your index. Explore all your features right where your videos live!",
+        "Step 1: Welcome to the Video to Text Arena - Explore & Experiment - Check out the GitHub repository and keep experimenting.",
       image: "/placeholder.svg?height=300&width=500",
+    },
+    {
+      title: "Introducing Video to Text Arena",
+      description:
+        "Step 2: Upload Your Videos - You can upload your videos in the TwelveLabs Platform. Access them here with your TwelveLabs API KEY.",
+      image: "/2_Upload_Video.gif",
     },
     {
       title: "Connect Your API Key",
       description:
-        "Connect your TwelveLabs API key to access your personal indexes and videos for comprehensive analysis.",
-      image: "/placeholder.svg?height=300&width=500",
-    },
-    {
-      title: "Select Your Content",
-      description:
-        "Choose from your video indexes and select specific videos to analyze with multiple AI models simultaneously.",
-      image: "/placeholder.svg?height=300&width=500",
-    },
-    {
-      title: "Compare AI Models",
-      description:
-        "Get insights from different AI models side-by-side and compare their analysis capabilities in real-time.",
-      image: "/placeholder.svg?height=300&width=500",
+        "Step 3: Connect Your API Key - Experiment with Default Sample videos or connect your own API KEY.",
+      image: "/3_API.gif",
     },
   ]
 
@@ -1324,7 +1318,7 @@ export function ModelEvaluationPlatform() {
               <Button
                 variant="ghost"
                 size="default"
-                className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground px-3 py-2"
+                className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground px-3 py-2 outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
               >
                 <svg
                   className="w-5 h-5"
@@ -1342,10 +1336,10 @@ export function ModelEvaluationPlatform() {
                 </svg>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] border-0 p-6 bg-gradient-to-br from-green-400 via-yellow-300 to-pink-400 overflow-hidden">
+            <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] border-2 border-gray-800 rounded-[58px] p-6 bg-gradient-to-br from-green-400 via-yellow-300 to-pink-400 overflow-hidden">
               {/* Background image overlay */}
               <div
-                className="absolute inset-0 opacity-80"
+                className="absolute inset-0 opacity-80 rounded-[58px]"
                 style={{
                   backgroundImage: `url(https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Model%20Card%20from%20DevCircle-VjxitbETGDj9ZfTwq2KQVOlodag0TK.png)`,
                   backgroundSize: "cover",
@@ -1357,27 +1351,27 @@ export function ModelEvaluationPlatform() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-black/20 backdrop-blur-md border-2 border-white/30 hover:bg-black/40 hover:border-white/50 transition-all duration-200 text-white hover:text-white shadow-lg"
+                  className="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border-2 border-gray-800 hover:bg-white/40 hover:border-gray-900 transition-all duration-200 text-gray-800 hover:text-gray-900 shadow-lg"
                 >
                   <X className="w-5 h-5" />
                 </Button>
               </DialogClose>
 
-              {/* Content container with better visibility */}
-              <div className="relative z-20 bg-black/40 backdrop-blur-md rounded-2xl p-8 h-full overflow-y-auto flex flex-col border border-white/20">
+              {/* Content container */}
+              <div className="relative z-20 bg-white/90 backdrop-blur-sm rounded-[58px] p-8 h-full overflow-y-auto flex flex-col">
                 <div className="text-center mb-8">
-                  <h2 className="text-4xl font-bold text-white mb-4 drop-shadow-2xl">
-                    Welcome to Model Evaluation Platform
+                  <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                    Introduction to Video-to-Text Arena
                   </h2>
-                  <p className="text-white text-lg leading-relaxed drop-shadow-lg font-medium">
+                  <p className="text-gray-700 text-lg leading-relaxed font-medium">
                     {tutorialSteps[currentTutorialStep].description}
                   </p>
                 </div>
 
                 {/* Tutorial content with image */}
-                <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 mb-8 border border-white/50 flex-shrink-0">
+                <div className="bg-gray-100 rounded-xl p-6 mb-8 flex-shrink-0">
                   <img
-                    src="/placeholder.svg?height=300&width=600"
+                    src={tutorialSteps[currentTutorialStep].image}
                     alt={`Tutorial step ${currentTutorialStep + 1}`}
                     className="w-full h-48 object-cover rounded-lg shadow-xl"
                   />
@@ -1391,34 +1385,34 @@ export function ModelEvaluationPlatform() {
                         key={index}
                         className={`w-4 h-4 rounded-full transition-all duration-300 border-2 ${
                           index === currentTutorialStep
-                            ? "bg-white border-white shadow-lg scale-110"
-                            : "bg-transparent border-white/60 hover:border-white hover:bg-white/20"
+                            ? "bg-gray-800 border-gray-800 shadow-lg scale-110"
+                            : "bg-transparent border-gray-600 hover:border-gray-800 hover:bg-gray-200"
                         }`}
                       />
                     ))}
                   </div>
 
                   <div className="flex gap-3">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePreviousTutorial}
-                      disabled={currentTutorialStep === 0}
-                      className="text-white hover:bg-white/30 disabled:opacity-50 backdrop-blur-sm border-2 border-white/40 font-semibold"
-                    >
-                      <ChevronLeft className="w-4 h-4 mr-1" />
-                      Previous
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleNextTutorial}
-                      disabled={currentTutorialStep === tutorialSteps.length - 1}
-                      className="text-white hover:bg-white/30 disabled:opacity-50 backdrop-blur-sm border-2 border-white/40 font-semibold"
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handlePreviousTutorial}
+                        disabled={currentTutorialStep === 0}
+                        className="text-gray-800 hover:bg-gray-100 disabled:opacity-50 font-semibold"
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleNextTutorial}
+                        disabled={currentTutorialStep === tutorialSteps.length - 1}
+                        className="text-gray-800 hover:bg-gray-100 disabled:opacity-50 font-semibold"
+                      >
+                        Next
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
                   </div>
                 </div>
               </div>

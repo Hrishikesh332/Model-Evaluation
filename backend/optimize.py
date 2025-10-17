@@ -115,12 +115,16 @@ class ParallelModelRunner:
         )
         logger.info(f"Registered model: {model_name}")
     
-    def execute_models_parallel(self, tasks: List[ModelTask], timeout: float = 300.0) -> ComparisonResult:
-
+    def execute_models_parallel(self, tasks: List[ModelTask], timeout: float = None) -> ComparisonResult:
+        from config import Config
+        
+        if timeout is None:
+            timeout = Config.MODEL_EXECUTION_TIMEOUT
+            
         start_time = time.time()
         comparison_result = ComparisonResult(parallel_execution=True)
         
-        logger.info(f"Starting parallel execution of {len(tasks)} models")
+        logger.info(f"Starting parallel execution of {len(tasks)} models (timeout: {timeout}s)")
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             future_to_task = {}
@@ -225,7 +229,7 @@ class OptimizedVideoAnalyzer:
     def analyze_video_parallel(self, query: str, selected_models: List[str], 
                              video_path: Optional[str] = None, 
                              video_id: Optional[str] = None,
-                             timeout: float = 300.0) -> Tuple[Dict[str, str], ComparisonResult]:
+                             timeout: float = None) -> Tuple[Dict[str, str], ComparisonResult]:
         
         tasks = []
         for model_name in selected_models:

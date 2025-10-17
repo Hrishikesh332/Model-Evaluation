@@ -1,5 +1,6 @@
 import os
 import base64
+import time
 import cv2
 import requests
 from datetime import datetime
@@ -48,6 +49,7 @@ class CacheManager:
         
         print(f"Extracting frames from video: {video_path}")
         frames = []
+        start_time = time.time()
         try:
             quality_settings = self.adaptive_frame_quality(video_path, num_frames)
             dimensions = quality_settings["dimensions"]
@@ -105,6 +107,9 @@ class CacheManager:
                 current_frame += 1
 
             video.release()
+            
+            extraction_time = time.time() - start_time
+            print(f"Frame extraction completed in {extraction_time:.2f}s for {cache_key}")
             
             if cache_key:
                 self.video_frames_cache[cache_key] = frames

@@ -414,7 +414,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             base_cache_key = f"{video_id}_base"
             if video_id and base_cache_key not in cache_manager.video_frames_cache:
                 print(f"Waiting for frame extraction to complete for video {video_id}")
-                if not video_service.wait_for_frames(video_id, timeout=30):
+                if not video_service.wait_for_frames(video_id):
                     return jsonify({"status": "error", "message": f"Frame extraction timeout for video {video_id}. Please try again."}), 408
         
         # Log API key sources for debugging
@@ -779,7 +779,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             if video_id and base_cache_key not in cache_manager.video_frames_cache:
                 # Wait for frame extraction to complete
                 print(f"Waiting for frame extraction to complete for video {video_id}")
-                if not video_service.wait_for_frames(video_id, timeout=30):
+                if not video_service.wait_for_frames(video_id):
                     return jsonify({"status": "error", "message": f"Frame extraction timeout for video {video_id}. Please try again."}), 408
         
         if not query or not index_id or not video_id:

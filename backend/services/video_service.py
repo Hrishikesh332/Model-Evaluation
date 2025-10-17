@@ -58,12 +58,12 @@ class VideoService:
             # Extract frames directly from URL without downloading the entire video
             print(f"Extracting frames directly from URL for video {video_id}")
             
-            # Start frame extraction in background thread
+            # Start frame extraction in background thread with retry mechanism
             extraction_thread = threading.Thread(
-                target=self.cache_manager.extract_frames_from_url,
-                args=(video_url, 10, cache_key)
+                target=self._extract_frames_with_retry,
+                args=(video_url, 10, cache_key, video_id),
+                daemon=True
             )
-            extraction_thread.daemon = True
             extraction_thread.start()
             
             return {
@@ -82,12 +82,18 @@ class VideoService:
                 "error": f"Error selecting video: {str(e)}"
             }
     
-    def wait_for_frames(self, video_id, timeout=30):
+    def wait_for_frames(self, video_id, timeout=None):
         """
         Wait for frame extraction to complete for a video
         """
+        from config import Config
+        if timeout is None:
+            timeout = Config.FRAME_EXTRACTION_TIMEOUT
+            
         base_cache_key = f"{video_id}_base"
         start_time = time.time()
+        
+        print(f"Waiting for frame extraction to complete for video {video_id} (timeout: {timeout}s)")
         
         while time.time() - start_time < timeout:
             if base_cache_key in self.cache_manager.video_frames_cache:
@@ -97,8 +103,40 @@ class VideoService:
                     return True
             time.sleep(0.5)  # Check every 500ms
         
-        print(f"Timeout waiting for frames for video {video_id}")
+        print(f"Timeout waiting for frames for video {video_id} after {timeout}s")
         return False
+    
+    def _extract_frames_with_retry(self, video_url, num_frames, cache_key, video_id, max_retries=3):
+        """
+        Extract frames with retry mechanism for better reliability
+        """
+        from config import Config
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Frame extraction attempt {attempt + 1}/{max_retries} for video {video_id}")
+                start_time = time.time()
+                
+                # Try to extract frames from URL
+                frames = self.cache_manager.extract_frames_from_url(video_url, num_frames, cache_key)
+                
+                if frames and len(frames) > 0:
+                    extraction_time = time.time() - start_time
+                    print(f"✅ Frame extraction successful for video {video_id} in {extraction_time:.2f}s ({len(frames)} frames)")
+                    return frames
+                else:
+                    print(f"⚠️ Frame extraction returned no frames for video {video_id} (attempt {attempt + 1})")
+                    
+            except Exception as e:
+                print(f"❌ Frame extraction failed for video {video_id} (attempt {attempt + 1}): {str(e)}")
+                
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * 5  # Exponential backoff: 5s, 10s, 15s
+                print(f"Retrying frame extraction for video {video_id} in {wait_time}s...")
+                time.sleep(wait_time)
+        
+        print(f"❌ Frame extraction failed for video {video_id} after {max_retries} attempts")
+        return []
     
     def select_video_for_nova(self, index_id, video_id, twelvelabs_service, is_public=False, actual_index_id=None):
         """

@@ -45,6 +45,11 @@ class Config:
         }
     ]
     
+    # Timeout configurations
+    FRAME_EXTRACTION_TIMEOUT = int(os.getenv("FRAME_EXTRACTION_TIMEOUT", "300"))  # 2 minutes default
+    MODEL_EXECUTION_TIMEOUT = int(os.getenv("MODEL_EXECUTION_TIMEOUT", "300"))   # 5 minutes default
+    REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "600"))                   # 10 minutes default
+    
     @staticmethod
     def create_directories():
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
