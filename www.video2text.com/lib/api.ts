@@ -19,6 +19,7 @@ export interface Video {
   id: string
   name: string
   duration: number
+  thumbnailUrl?: string
 }
 
 export interface ModelStatus {

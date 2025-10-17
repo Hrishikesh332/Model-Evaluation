@@ -1279,10 +1279,38 @@ export function ModelEvaluationPlatform() {
             <SelectContent className="bg-card border-border shadow-lg">
               {videos.map((video) => (
                 <SelectItem key={video.id} value={video.id} className="hover:bg-accent hover:text-accent-foreground">
-                  <div className="flex items-center gap-2">
-                    <Film className="w-4 h-4" />
-                    <span>{video.name}</span>
-                    <span className="text-xs text-muted-foreground">({video.duration}s)</span>
+                  <div className="flex items-center gap-3 w-full">
+                    {/* Thumbnail */}
+                    <div className="flex-shrink-0 w-12 h-8 rounded overflow-hidden bg-muted">
+                      {video.thumbnailUrl ? (
+                        <img
+                          src={video.thumbnailUrl}
+                          alt={`${video.name} thumbnail`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            // Fallback to icon if thumbnail fails to load
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></div>';
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Film className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Video Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-medium">{video.name}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">({video.duration}s)</span>
+                      </div>
+                    </div>
                   </div>
                 </SelectItem>
               ))}
