@@ -446,7 +446,7 @@ export function ModelEvaluationPlatform() {
           if (limitedVideos.length > 0) {
             setSelectedVideo(limitedVideos[0])
             // Select the video in the API
-            await apiService.selectVideo(selectedIndex.id, limitedVideos[0].id)
+            await apiService.selectVideo(selectedIndex.id, limitedVideos[0].id, leftModel)
             console.log(`Auto-selected first video: ${limitedVideos[0].name}`)
           } else {
             // Handle case where index has no videos
@@ -595,7 +595,7 @@ export function ModelEvaluationPlatform() {
               console.log(`[v0] Auto-selected video: ${firstVideo.name}`)
 
               try {
-                await apiService.selectVideo(firstIndex.id, firstVideo.id)
+                await apiService.selectVideo(firstIndex.id, firstVideo.id, leftModel)
                 console.log("[v0] Video selected in backend for analysis")
               } catch (selectError) {
                 console.warn("[v0] Failed to select video in backend:", selectError)
@@ -708,7 +708,7 @@ export function ModelEvaluationPlatform() {
       setVideoProcessingStatus("Processing video frames...")
 
       try {
-        await apiService.selectVideo(selectedIndex.id, video.id)
+        await apiService.selectVideo(selectedIndex.id, video.id, leftModel)
         setTimeout(() => {
           setIsVideoProcessing(false)
           setVideoProcessingStatus("Video ready for analysis")

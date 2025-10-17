@@ -217,10 +217,17 @@ class ApiService {
     }
   }
 
-  async selectVideo(indexId: string, videoId: string) {
+  async selectVideo(indexId: string, videoId: string, model?: string) {
+    const body: any = { index_id: indexId, video_id: videoId }
+    
+    // If Nova model is selected, indicate that video download is needed
+    if (model === 'nova') {
+      body.use_nova = true
+    }
+    
     return this.requestWithBaseUrl(NEXT_API_BASE_URL, "/video/select", {
       method: "POST",
-      body: JSON.stringify({ index_id: indexId, video_id: videoId }),
+      body: JSON.stringify(body),
     })
   }
 
