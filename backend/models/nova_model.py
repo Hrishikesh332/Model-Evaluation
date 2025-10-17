@@ -73,7 +73,7 @@ class NovaModel:
             logger.error(f"Failed to initialize Bedrock client: {e}")
             self.client = None
     
-    def _preprocess_video(self, video_path: str, max_frames: int = 10, max_size_mb: int = 50) -> str:
+    def _preprocess_video(self, video_path: str, max_frames: int = 5, max_size_mb: int = 10) -> str:
         """
         Preprocess video to extract key frames and reduce size for Nova model
         """
@@ -98,6 +98,13 @@ class NovaModel:
             
             logger.info(f"Video info: {total_frames} frames, {fps:.2f} fps, {duration:.2f}s duration")
             
+            # Check if video is too long (Nova has duration limits)
+            if duration > 60:  # Limit to 60 seconds
+                logger.warning(f"Video too long ({duration:.1f}s), limiting to first 60 seconds")
+                # Calculate frames for first 60 seconds
+                max_frames_for_duration = int(60 * fps)
+                total_frames = min(total_frames, max_frames_for_duration)
+            
             # Calculate frame interval
             frame_interval = max(1, total_frames // max_frames)
             
@@ -106,13 +113,29 @@ class NovaModel:
             temp_path = temp_video.name
             temp_video.close()
             
-            # Get video properties
+            # Get video properties and reduce resolution for smaller file size
             width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
-            # Create video writer
+            # Reduce resolution to max 480p for smaller file size
+            max_width = 640
+            max_height = 480
+            if width > max_width or height > max_height:
+                scale = min(max_width / width, max_height / height)
+                new_width = int(width * scale)
+                new_height = int(height * scale)
+            else:
+                new_width = width
+                new_height = height
+            
+            # Reduce frame rate to 10 fps for smaller file size
+            new_fps = min(fps, 10.0)
+            
+            logger.info(f"Reducing video from {width}x{height}@{fps:.1f}fps to {new_width}x{new_height}@{new_fps:.1f}fps")
+            
+            # Create video writer with reduced settings
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-            out = cv2.VideoWriter(temp_path, fourcc, fps, (width, height))
+            out = cv2.VideoWriter(temp_path, fourcc, new_fps, (new_width, new_height))
             
             frame_count = 0
             frames_written = 0
@@ -123,6 +146,9 @@ class NovaModel:
                     break
                 
                 if frame_count % frame_interval == 0:
+                    # Resize frame if needed
+                    if new_width != width or new_height != height:
+                        frame = cv2.resize(frame, (new_width, new_height))
                     out.write(frame)
                     frames_written += 1
                 
@@ -222,8 +248,10 @@ For a more detailed analysis, please try with a shorter video or contact support
                         logger.warning(f"❌ Failed with model: {model_id}")
                         continue
                 except Exception as e:
-                    logger.warning(f"❌ Error with model {model_id}: {e}")
-                    continue
+                    error_msg = f"Error in Nova model analysis with {model_id}: {str(e)}"
+                    logger.warning(f"❌ {error_msg}")
+                    # Return the error message instead of continuing
+                    return error_msg
             
             # If all models failed, return fallback
             logger.warning("All Nova models failed, using fallback analysis")
@@ -251,9 +279,11 @@ For a more detailed analysis, please try with a shorter video or contact support
                 data_size_mb = len(base64_string) / (1024 * 1024)
                 logger.info(f"Base64 encoded data size: {data_size_mb:.2f} MB")
                 
-                if data_size_mb > 50:  # AWS Bedrock has input size limits
+                if data_size_mb > 10:  # AWS Nova has strict input size limits
                     logger.warning(f"Data still too large ({data_size_mb:.2f} MB), using fallback analysis")
                     return self._fallback_analysis(video_path, prompt)
+                
+                logger.info(f"✅ Data size acceptable ({data_size_mb:.2f} MB), proceeding with Nova analysis")
                 
                 # Define system prompt
                 system_list = [
@@ -305,11 +335,20 @@ For a more detailed analysis, please try with a shorter video or contact support
                 )
                 
                 # Parse response
-                model_response = json.loads(response["body"].read())
-                content_text = model_response["output"]["message"]["content"][0]["text"]
+                response_body = response["body"].read()
+                logger.info(f"Raw response from Nova API: {response_body[:200]}...")
                 
-                logger.info(f"Nova model analysis completed successfully with {model_id}")
-                return content_text
+                model_response = json.loads(response_body)
+                logger.info(f"Parsed response structure: {list(model_response.keys())}")
+                
+                if "output" in model_response and "message" in model_response["output"]:
+                    content_text = model_response["output"]["message"]["content"][0]["text"]
+                    logger.info(f"Nova model analysis completed successfully with {model_id}")
+                    logger.info(f"Response text length: {len(content_text)} characters")
+                    return content_text
+                else:
+                    logger.error(f"Unexpected response structure: {model_response}")
+                    return f"Error: Unexpected response structure from Nova model"
                 
             finally:
                 # Clean up temporary file if created

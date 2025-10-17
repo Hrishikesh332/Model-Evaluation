@@ -5,6 +5,7 @@ from performance import performance_monitor
 from optimize import OptimizedVideoAnalyzer, CacheOptimizer
 from services.twelvelabs_service import TwelveLabsService
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -332,15 +333,27 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         if api_key:
             # Create a temporary service instance for this request to avoid conflicts
             temp_service = TwelveLabsService(api_key)
-            result = video_service.select_video(index_id, video_id, temp_service)
+            
+            # Check if Nova model is being used (requires video download)
+            use_nova = request.json.get('use_nova', False)
+            
+            # Only download video if Nova is specifically requested
+            if use_nova:
+                result = video_service.select_video_for_nova(index_id, video_id, temp_service)
+            else:
+                result = video_service.select_video(index_id, video_id, temp_service)
             
             if result["success"]:
-                session['video_path'] = result["video_path"]
+                # Store video URL instead of video path for optimized processing
+                session['video_url'] = result.get("video_url", "")
+                session['video_path'] = result.get("video_path", "")  # Keep for backward compatibility
                 return jsonify({
                     "status": "success",
                     "message": result["message"],
                     "video_id": video_id,
-                    "video_path": result["video_path"],
+                    "video_url": result.get("video_url", ""),
+                    "video_path": result.get("video_path", ""),  # Keep for backward compatibility
+                    "cached": result.get("cached", False),
                     "source": source
                 })
             else:
@@ -390,12 +403,19 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         # Get video info from request body first, then fall back to session
         index_id = request.json.get('index_id') or session.get('selected_index_id')
         video_id = request.json.get('video_id') or session.get('selected_video_id')
-        video_path = request.json.get('video_path') or session.get('video_path')
         
         print(f"Request JSON: {request.json}")
         print(f"Session data - index_id: {session.get('selected_index_id')}, video_id: {session.get('selected_video_id')}")
         print(f"Processing query: '{query}' for video_id: {video_id} with model: {selected_model}")
         print(f"Execution mode: {execution_mode}, Compare models: {compare_models}")
+        
+        # Wait for frame extraction if needed (skip for Nova model)
+        if selected_model != 'nova':
+            base_cache_key = f"{video_id}_base"
+            if video_id and base_cache_key not in cache_manager.video_frames_cache:
+                print(f"Waiting for frame extraction to complete for video {video_id}")
+                if not video_service.wait_for_frames(video_id, timeout=30):
+                    return jsonify({"status": "error", "message": f"Frame extraction timeout for video {video_id}. Please try again."}), 408
         
         # Log API key sources for debugging
         twelvelabs_key_source = "header" if twelvelabs_header_key else ("session" if session.get('twelvelabs_api_key') else "environment")
@@ -498,7 +518,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         try:
             if compare_models:
                 comparison_result = optimized_analyzer.run_model_comparison(
-                    query, video_path, video_id, [selected_model, 'pegasus']
+                    query, None, video_id, [selected_model, 'pegasus']
                 )
                 
                 return jsonify({
@@ -512,13 +532,20 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 if selected_model != 'pegasus':
                     selected_models.append('pegasus') 
                 
+                # For Nova model, we need to pass the video file path
+                video_path_for_analysis = None
+                if 'nova' in selected_models:
+                    # Construct video path directly (no session dependency for parallel execution)
+                    video_filename = f"{video_id}.mp4"
+                    video_path_for_analysis = os.path.join(Config.VIDEO_FOLDER, video_filename)
+                
                 parallel_responses, comparison_result = optimized_analyzer.analyze_video_parallel(
-                    query, selected_models, video_path, video_id
+                    query, selected_models, video_path_for_analysis, video_id
                 )
                 
-                actual_responses = await_get_actual_responses(query, selected_models, video_path, 
+                actual_responses = await_get_actual_responses(query, selected_models, video_id, 
                                                            gemini_model, openai_model, twelvelabs_service, 
-                                                           cache_manager, index_id, video_id)
+                                                           cache_manager, index_id)
                 
                 return jsonify({
                     "status": "success",
@@ -530,16 +557,26 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             
             else:
                 responses, performance_data = await_get_responses_with_monitoring(
-                    query, selected_model, video_path, gemini_model, openai_model, 
-                    twelvelabs_service, cache_manager, index_id, video_id
+                    query, selected_model, video_id, gemini_model, openai_model, 
+                    twelvelabs_service, cache_manager, index_id
                 )
                 
-                return jsonify({
-                    "status": "success",
-                    "responses": responses,
-                    "performance_data": performance_data,
-                    "execution_mode": "sequential"
-                })
+                # For single model analysis, return the response directly
+                if selected_model in responses:
+                    return jsonify({
+                        "status": "success",
+                        "response": responses[selected_model],
+                        "model": selected_model,
+                        "performance_data": performance_data,
+                        "execution_mode": "sequential"
+                    })
+                else:
+                    return jsonify({
+                        "status": "error",
+                        "message": f"No response from {selected_model}",
+                        "responses": responses,
+                        "performance_data": performance_data
+                    })
                 
         except Exception as e:
             logger.error(f"Error in enhanced analyze: {e}")
@@ -621,14 +658,13 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                     
                     try:
                         if model_name == 'gemini':
-                            # Get Gemini response
-                            response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
-                            # Split response into chunks for streaming effect
-                            words = response.split()
-                            for word in words:
-                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word + ' ', 'model': model_name})}\n\n"
+                            # Get Gemini streaming response using cached frames
+                            response_text = ""
+                            for word in gemini_model.generate_streaming_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager):
+                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word, 'model': model_name})}\n\n"
+                                response_text += word
                                 time.sleep(0.03)  # Small delay for realistic streaming
-                            responses["gemini"] = response
+                            responses["gemini"] = response_text
                         
                         elif model_name == 'pegasus':
                             # Get Pegasus response
@@ -641,12 +677,13 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                             responses["pegasus"] = response
                         
                         elif model_name == 'gpt4o':
-                            response = openai_model.generate_response(query, video_path, cache_manager)
-                            words = response.split()
-                            for word in words:
-                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word + ' ', 'model': model_name})}\n\n"
+                            # Get OpenAI streaming response using cached frames
+                            response_text = ""
+                            for word in openai_model.generate_streaming_response_from_cached_frames(query, video_id, cache_manager):
+                                yield f"data: {json.dumps({'event_type': 'text_generation', 'text': word, 'model': model_name})}\n\n"
+                                response_text += word
                                 time.sleep(0.03)
-                            responses["gpt4o"] = response
+                            responses["gpt4o"] = response_text
                     
                     except Exception as e:
                         yield f"data: {json.dumps({'event_type': 'error', 'model': model_name, 'message': str(e)})}\n\n"
@@ -734,21 +771,19 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
             'openai': openai_header_key or session.get('openai_api_key') or Config.OPENAI_API_KEY
         }
         
-        # If video_path is not provided, try to get it from video service
-        if not video_path and video_id:
-            try:
-                # Get video path from video service
-                video_filename = f"{video_id}.mp4"
-                video_path = os.path.join(Config.VIDEO_FOLDER, video_filename)
-                
-                # Check if video file exists
-                if not os.path.exists(video_path):
-                    return jsonify({"status": "error", "message": f"Video file not found. Please select a video first."}), 400
-            except Exception as e:
-                return jsonify({"status": "error", "message": f"Error getting video path: {str(e)}"}), 400
+        # Check if we have cached frames for the video, wait if extraction is in progress
+        # Skip frame extraction wait if Nova is in the models list
+        models_to_run = request.json.get('models', [])
+        if 'nova' not in models_to_run:
+            base_cache_key = f"{video_id}_base"
+            if video_id and base_cache_key not in cache_manager.video_frames_cache:
+                # Wait for frame extraction to complete
+                print(f"Waiting for frame extraction to complete for video {video_id}")
+                if not video_service.wait_for_frames(video_id, timeout=30):
+                    return jsonify({"status": "error", "message": f"Frame extraction timeout for video {video_id}. Please try again."}), 408
         
-        if not query or not index_id or not video_id or not video_path:
-            return jsonify({"status": "error", "message": "Missing required parameters or video file not found"}), 400
+        if not query or not index_id or not video_id:
+            return jsonify({"status": "error", "message": "Missing required parameters"}), 400
         
         # Check if we're using user API key but trying to access default account data
         if twelvelabs_header_key or session.get('twelvelabs_api_key'):
@@ -834,7 +869,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                             api_key = user_api_keys['gemini']
                             if api_key:
                                 gemini_model.update_api_key(api_key)
-                                response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                                response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager)
                             else:
                                 response = "Error: No Gemini API key available"
                         elif model_name == 'gemini-2.0-flash':
@@ -842,7 +877,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                             api_key = user_api_keys['gemini']
                             if api_key:
                                 gemini_model.update_api_key(api_key)
-                                response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                                response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager)
                             else:
                                 response = "Error: No Gemini API key available"
                         elif model_name == 'gemini-2.5-pro':
@@ -850,7 +885,7 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                             api_key = user_api_keys['gemini']
                             if api_key:
                                 gemini_model.update_api_key(api_key)
-                                response = gemini_model.generate_response(query, video_path, "gemini-2.5-pro", cache_manager)
+                                response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.5-pro", cache_manager)
                             else:
                                 response = "Error: No Gemini API key available"
                         elif model_name == 'pegasus' or model_name == 'pegasus-1.2':
@@ -880,11 +915,24 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                             api_key = user_api_keys['openai']
                             if api_key:
                                 openai_model.update_api_key(api_key)
-                                response = openai_model.generate_response(query, video_path, cache_manager)
+                                response = openai_model.generate_response_from_cached_frames(query, video_id, cache_manager)
                             else:
                                 response = "Error: No OpenAI API key available"
                         elif model_name == 'nova':
-                            response = nova_model.analyze_video(video_path, query)
+                            # Nova model needs video file - check if it exists
+                            # Construct video path directly (no session dependency for parallel execution)
+                            video_filename = f"{video_id}.mp4"
+                            video_path = os.path.join(Config.VIDEO_FOLDER, video_filename)
+                            
+                            if os.path.exists(video_path):
+                                print(f"🔍 Calling Nova model with video: {video_path}")
+                                response = nova_model.analyze_video(video_path, query)
+                                print(f"🔍 Nova response type: {type(response)}, length: {len(str(response))}")
+                                print(f"🔍 Nova response content: '{response}'")
+                                if not response or (isinstance(response, str) and response.strip() == ""):
+                                    response = "Error: Nova model returned empty response. Please try again or use a different model."
+                            else:
+                                response = "Error: Video file not found for Nova model. Please select the video first with Nova model enabled."
                         else:
                             response = f"Unknown model: {model_name}"
                         
@@ -1170,21 +1218,21 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
                 "message": f"Error preloading videos: {str(e)}"
             }), 500
 
-    def await_get_actual_responses(query, selected_models, video_path, gemini_model, 
+    def await_get_actual_responses(query, selected_models, video_id, gemini_model, 
                                  openai_model, twelvelabs_service, cache_manager, 
-                                 index_id, video_id):
+                                 index_id):
         responses = {}
         
         for model_name in selected_models:
             try:
                 if model_name == 'gemini':
-                    response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
+                    response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager)
                     responses["gemini"] = response
                 elif model_name == 'gemini-2.0-flash':
-                    response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                    response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager)
                     responses["gemini-2.0-flash"] = response
                 elif model_name == 'gpt4o':
-                    response = openai_model.generate_response(query, video_path, cache_manager)
+                    response = openai_model.generate_response_from_cached_frames(query, video_id, cache_manager)
                     responses["gpt4o"] = response
                 elif model_name == 'pegasus':
                     actual_index_id = session.get('actual_index_id', index_id)
@@ -1195,9 +1243,9 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         
         return responses
 
-    def await_get_responses_with_monitoring(query, selected_model, video_path, 
+    def await_get_responses_with_monitoring(query, selected_model, video_id, 
                                           gemini_model, openai_model, twelvelabs_service, 
-                                          cache_manager, index_id, video_id):
+                                          cache_manager, index_id):
         responses = {}
         performance_data = {}
         
@@ -1222,14 +1270,28 @@ def create_api_routes(twelvelabs_service, gemini_model, openai_model, video_serv
         start_time = time.time()
         try:
             if selected_model == 'gemini':
-                response = gemini_model.generate_response(query, video_path, "gemini-1.5-pro", cache_manager)
+                response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager)
                 responses["gemini"] = response
             elif selected_model == 'gemini-2.0-flash':
-                response = gemini_model.generate_response(query, video_path, "gemini-2.0-flash", cache_manager)
+                response = gemini_model.generate_response_from_cached_frames(query, video_id, "gemini-2.0-flash", cache_manager)
                 responses["gemini-2.0-flash"] = response
             elif selected_model == 'gpt4o':
-                response = openai_model.generate_response(query, video_path, cache_manager)
+                response = openai_model.generate_response_from_cached_frames(query, video_id, cache_manager)
                 responses["gpt4o"] = response
+            elif selected_model == 'nova':
+                # Nova model needs video file - check if it exists
+                # Construct video path directly
+                video_filename = f"{video_id}.mp4"
+                video_path = os.path.join(Config.VIDEO_FOLDER, video_filename)
+                
+                if os.path.exists(video_path):
+                    response = nova_model.analyze_video(video_path, query)
+                    if not response or (isinstance(response, str) and response.strip() == ""):
+                        response = "Error: Nova model returned empty response. Please try again or use a different model."
+                    responses["nova"] = response
+                else:
+                    response = "Error: Video file not found for Nova model. Please select the video first with Nova model enabled."
+                    responses["nova"] = response
             
             performance_data[selected_model] = {
                 "latency": time.time() - start_time,

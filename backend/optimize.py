@@ -1,6 +1,7 @@
 import threading
 import time
 import concurrent.futures
+import os
 from typing import Dict, List, Tuple, Any, Optional, Callable
 from dataclasses import dataclass
 import queue
@@ -37,33 +38,38 @@ class ModelExecutor:
         cache_hit = False
         
         try:
-            if hasattr(self.model_instance, 'generate_response'):
-                # Handle different model types with their specific parameter requirements
-                if self.model_name == 'pegasus':
-                    # TwelveLabs service expects: generate_response(video_id, prompt, index_id)
-                    # We need to get the actual video_id from the task
-                    actual_video_id = task.video_id if task.video_id else None
-                    if not actual_video_id and task.video_path:
-                        # Extract video_id from video_path if available
-                        actual_video_id = task.video_path.split('/')[-1].split('.')[0]
-                    
-                    if actual_video_id:
-                        response = self.model_instance.generate_response(
-                            video_id=actual_video_id,
-                            prompt=task.prompt
-                        )
-                    else:
-                        raise ValueError("No video_id available for Pegasus model")
+            # Handle different model types with their specific parameter requirements
+            if self.model_name == 'pegasus':
+                # TwelveLabs service expects: generate_response(video_id, prompt, index_id)
+                # We need to get the actual video_id from the task
+                actual_video_id = task.video_id if task.video_id else None
+                if not actual_video_id and task.video_path:
+                    # Extract video_id from video_path if available
+                    actual_video_id = task.video_path.split('/')[-1].split('.')[0]
+                
+                if actual_video_id:
+                    response = self.model_instance.generate_response(
+                        video_id=actual_video_id,
+                        prompt=task.prompt
+                    )
                 else:
-                    # Other models (Gemini, OpenAI) expect: generate_response(prompt, video_path, ...)
-                    if task.cache_manager and 'cache_manager' in self.model_instance.generate_response.__code__.co_varnames:
-                        response = self.model_instance.generate_response(
-                            task.prompt, 
-                            task.video_path, 
-                            cache_manager=task.cache_manager
-                        )
-                    else:
-                        response = self.model_instance.generate_response(task.prompt, task.video_path)
+                    raise ValueError("No video_id available for Pegasus model")
+            elif self.model_name == 'nova':
+                # Nova model expects: analyze_video(video_path, prompt)
+                if task.video_path and os.path.exists(task.video_path):
+                    response = self.model_instance.analyze_video(task.video_path, task.prompt)
+                else:
+                    raise ValueError("No valid video file available for Nova model")
+            elif hasattr(self.model_instance, 'generate_response'):
+                # Other models (Gemini, OpenAI) expect: generate_response(prompt, video_path, ...)
+                if task.cache_manager and 'cache_manager' in self.model_instance.generate_response.__code__.co_varnames:
+                    response = self.model_instance.generate_response(
+                        task.prompt, 
+                        task.video_path, 
+                        cache_manager=task.cache_manager
+                    )
+                else:
+                    response = self.model_instance.generate_response(task.prompt, task.video_path)
             else:
                 raise AttributeError(f"Model {self.model_name} does not have generate_response method")
             

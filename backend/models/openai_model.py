@@ -128,6 +128,125 @@ class OpenAIModel:
         except Exception as e:
             print(f"Error extracting frames for GPT-4o: {str(e)}")
             return []
+
+    def generate_response_from_cached_frames(self, prompt, video_id, cache_manager=None):
+        """
+        Generate response using cached frames (optimized for URL-based frame extraction)
+        """
+        if not self.api_key:
+            return "OpenAI API key not available. Please check your API key."
+        
+        if not cache_manager:
+            return "Cache manager not available for frame extraction."
+        
+        try:
+            cache_key = f"{video_id}_gpt4o"
+            base_cache_key = f"{video_id}_base"
+            
+            # Get frames from base cache or model-specific cache
+            frames = cache_manager.video_frames_cache.get(cache_key, [])
+            if not frames:
+                # Try to get from base cache and copy to model-specific cache
+                base_frames = cache_manager.video_frames_cache.get(base_cache_key, [])
+                if base_frames:
+                    cache_manager.video_frames_cache[cache_key] = base_frames
+                    frames = base_frames
+                else:
+                    return "Error: No cached frames available for this video. Please select the video first."
+            
+            # Convert frames to base64 format for OpenAI
+            base64_frames = []
+            for frame in frames:
+                base64_frames.append(frame["inline_data"]["data"])
+            
+            if not base64_frames:
+                return "Error: No valid frames found in cache."
+            
+            # Create the messages for OpenAI Vision API
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"Analyze these video frames and answer: {prompt}"},
+                        *[{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}} for frame in base64_frames]
+                    ]
+                }
+            ]
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                max_tokens=4000
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            return f"OpenAI API Error: {str(e)}"
+
+    def generate_streaming_response_from_cached_frames(self, prompt, video_id, cache_manager=None):
+        """
+        Generate streaming response using cached frames (optimized for URL-based frame extraction)
+        """
+        if not self.api_key:
+            yield "OpenAI API key not available. Please check your API key."
+            return
+        
+        if not cache_manager:
+            yield "Cache manager not available for frame extraction."
+            return
+        
+        try:
+            cache_key = f"{video_id}_gpt4o"
+            base_cache_key = f"{video_id}_base"
+            
+            # Get frames from base cache or model-specific cache
+            frames = cache_manager.video_frames_cache.get(cache_key, [])
+            if not frames:
+                # Try to get from base cache and copy to model-specific cache
+                base_frames = cache_manager.video_frames_cache.get(base_cache_key, [])
+                if base_frames:
+                    cache_manager.video_frames_cache[cache_key] = base_frames
+                    frames = base_frames
+                else:
+                    yield "Error: No cached frames available for this video. Please select the video first."
+                    return
+            
+            # Convert frames to base64 format for OpenAI
+            base64_frames = []
+            for frame in frames:
+                base64_frames.append(frame["inline_data"]["data"])
+            
+            if not base64_frames:
+                yield "Error: No valid frames found in cache."
+                return
+            
+            # Create the messages for OpenAI Vision API
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"Analyze these video frames and answer: {prompt}"},
+                        *[{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{frame}"}} for frame in base64_frames]
+                    ]
+                }
+            ]
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                max_tokens=4000
+            )
+            
+            full_text = response.choices[0].message.content
+            
+            # Split response into words for streaming effect
+            words = full_text.split()
+            for word in words:
+                yield word + ' '
+            
+        except Exception as e:
+            yield f"OpenAI API Error: {str(e)}"
     
     def test_connection(self):
         try:

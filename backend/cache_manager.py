@@ -1,6 +1,7 @@
 import os
 import base64
 import cv2
+import requests
 from datetime import datetime
 from config import Config
 
@@ -62,15 +63,31 @@ class CacheManager:
                 print("Error: Unable to determine video FPS.")
                 return []
 
-            frame_interval = total_frames // num_frames
+            # Calculate truly equidistant frame positions across the entire video
+            if total_frames <= num_frames:
+                # If video has fewer frames than requested, extract all frames
+                frame_positions = list(range(total_frames))
+            else:
+                # Calculate equidistant positions across the entire video duration
+                frame_positions = []
+                for i in range(num_frames):
+                    # Distribute frames evenly from start to end (inclusive)
+                    position = int((i * (total_frames - 1)) / (num_frames - 1))
+                    frame_positions.append(position)
+            
+            print(f"Frame positions: {frame_positions}")
+            
             current_frame = 0
             extracted = 0
+            position_index = 0
 
-            while video.isOpened() and extracted < num_frames:
+            while video.isOpened() and extracted < num_frames and position_index < len(frame_positions):
                 ret, frame = video.read()
                 if not ret:
                     break
-                if current_frame % frame_interval == 0:
+                
+                # Check if current frame is one we want to extract
+                if current_frame == frame_positions[position_index]:
                     resized_frame = cv2.resize(frame, dimensions)
                     encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
                     _, buffer = cv2.imencode('.jpg', resized_frame, encode_param)
@@ -82,6 +99,9 @@ class CacheManager:
                         }
                     })
                     extracted += 1
+                    position_index += 1
+                    print(f"Extracted frame {extracted}/{num_frames} at position {current_frame}")
+                    
                 current_frame += 1
 
             video.release()
@@ -104,6 +124,126 @@ class CacheManager:
         except Exception as e:
             print(f"Error extracting frames: {str(e)}")
             return []
+
+    # Extract frames directly from video URL without downloading the entire video
+    def extract_frames_from_url(self, video_url, num_frames=10, cache_key=None):
+        """
+        Extract frames directly from video URL using OpenCV's VideoCapture.
+        This is much more efficient than downloading the entire video.
+        """
+        if cache_key and cache_key in self.video_frames_cache:
+            cached_frames = self.video_frames_cache[cache_key]
+            if cached_frames and len(cached_frames) > 0:
+                print(f"✅ Using {len(cached_frames)} cached frames for {cache_key}")
+                return cached_frames
+            else:
+                print(f"⚠️  Cache key {cache_key} exists but has no frames, re-extracting...")
+        
+        print(f"🔄 Extracting {num_frames} frames directly from URL: {video_url[:50]}...")
+        frames = []
+        try:
+            # OpenCV can read from URLs directly
+            video = cv2.VideoCapture(video_url)
+            
+            if not video.isOpened():
+                print(f"Error: Could not open video URL: {video_url}")
+                return []
+            
+            total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = video.get(cv2.CAP_PROP_FPS)
+            
+            if fps <= 0 or total_frames <= 0:
+                print("Error: Unable to determine video properties from URL")
+                video.release()
+                return []
+            
+            # Use adaptive quality settings (similar to file-based extraction)
+            # Default to reasonable settings for URL-based extraction
+            dimensions = (640, 360)  # Standard quality for URL extraction
+            jpeg_quality = 85
+            
+            # Calculate truly equidistant frame positions across the entire video
+            if total_frames <= num_frames:
+                # If video has fewer frames than requested, extract all frames
+                frame_positions = list(range(total_frames))
+            else:
+                # Calculate equidistant positions across the entire video duration
+                frame_positions = []
+                for i in range(num_frames):
+                    # Distribute frames evenly from start to end (inclusive)
+                    position = int((i * (total_frames - 1)) / (num_frames - 1))
+                    frame_positions.append(position)
+            
+            print(f"Video properties: {total_frames} frames, {fps} fps, extracting {num_frames} frames")
+            print(f"Frame positions: {frame_positions}")
+            
+            current_frame = 0
+            extracted = 0
+            position_index = 0
+            
+            while video.isOpened() and extracted < num_frames and position_index < len(frame_positions):
+                ret, frame = video.read()
+                if not ret:
+                    break
+                
+                # Check if current frame is one we want to extract
+                if current_frame == frame_positions[position_index]:
+                    # Resize and encode frame
+                    resized_frame = cv2.resize(frame, dimensions)
+                    encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), jpeg_quality]
+                    _, buffer = cv2.imencode('.jpg', resized_frame, encode_param)
+                    img_base64 = base64.b64encode(buffer).decode('utf-8')
+                    frames.append({
+                        "inline_data": {
+                            "mime_type": "image/jpeg",
+                            "data": img_base64
+                        }
+                    })
+                    extracted += 1
+                    position_index += 1
+                    print(f"Extracted frame {extracted}/{num_frames} at position {current_frame}")
+                    
+                current_frame += 1
+            
+            video.release()
+            
+            if cache_key and frames:
+                self.video_frames_cache[cache_key] = frames
+                print(f"Cached {len(frames)} frames from URL for {cache_key}")
+                
+                # Save to disk cache for future use
+                cache_dir = os.path.join(Config.CACHE_FOLDER, cache_key)
+                os.makedirs(cache_dir, exist_ok=True)
+                
+                for i, frame in enumerate(frames):
+                    frame_path = os.path.join(cache_dir, f"frame_{i}.jpg")
+                    with open(frame_path, "wb") as f:
+                        f.write(base64.b64decode(frame["inline_data"]["data"]))
+            
+            print(f"Successfully extracted {len(frames)} frames from URL")
+            return frames
+            
+        except Exception as e:
+            print(f"Error extracting frames from URL: {str(e)}")
+            return []
+
+    def has_cached_frames(self, cache_key):
+        """
+        Check if frames are already cached for a given cache key
+        """
+        if cache_key in self.video_frames_cache:
+            cached_frames = self.video_frames_cache[cache_key]
+            return cached_frames and len(cached_frames) > 0
+        return False
+
+    def get_cached_frames_count(self, cache_key):
+        """
+        Get the number of cached frames for a given cache key
+        """
+        if cache_key in self.video_frames_cache:
+            cached_frames = self.video_frames_cache[cache_key]
+            return len(cached_frames) if cached_frames else 0
+        return 0
 
     def load_cached_frames_from_disk(self, video_id, model):
 
