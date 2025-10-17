@@ -370,6 +370,7 @@ export function ModelEvaluationPlatform() {
       description:
         "Step 1: Welcome to the Video to Text Arena - Explore & Experiment - Check out the GitHub repository and keep experimenting.",
       image: "/placeholder.svg?height=300&width=500",
+      youtubeEmbed: "https://www.youtube.com/embed/-o11J3n4VLM",
     },
     {
       title: "Introducing Video to Text Arena",
@@ -1368,13 +1369,24 @@ export function ModelEvaluationPlatform() {
                   </p>
                 </div>
 
-                {/* Tutorial content with image */}
+                {/* Tutorial content with image or YouTube embed */}
                 <div className="bg-gray-100 rounded-xl p-6 mb-8 flex-shrink-0">
-                  <img
-                    src={tutorialSteps[currentTutorialStep].image}
-                    alt={`Tutorial step ${currentTutorialStep + 1}`}
-                    className="w-full h-48 object-cover rounded-lg shadow-xl"
-                  />
+                  {tutorialSteps[currentTutorialStep].youtubeEmbed ? (
+                    <iframe
+                      src={tutorialSteps[currentTutorialStep].youtubeEmbed}
+                      title={`Tutorial step ${currentTutorialStep + 1}`}
+                      className="w-full h-48 rounded-lg shadow-xl"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <img
+                      src={tutorialSteps[currentTutorialStep].image}
+                      alt={`Tutorial step ${currentTutorialStep + 1}`}
+                      className="w-full h-48 object-cover rounded-lg shadow-xl"
+                    />
+                  )}
                 </div>
 
                 {/* Navigation and step indicators */}
