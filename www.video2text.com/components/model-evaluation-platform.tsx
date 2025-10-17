@@ -20,7 +20,6 @@ import {
   Github,
   Sun,
   Moon,
-  Trophy,
   ChevronLeft,
   ChevronRight,
   X,
@@ -413,7 +412,6 @@ export function ModelEvaluationPlatform() {
         else if (modelsResponse.models.nova) setLeftModel("nova")
 
         if (modelsResponse.models["pegasus-1.2"]) setRightModel("pegasus-1.2")
-        else if (modelsResponse.models.nova) setRightModel("nova")
 
         const statusMessage = apiMode === "user" 
           ? "Connected using user API key" 
@@ -441,13 +439,15 @@ export function ModelEvaluationPlatform() {
         try {
           const videosResponse = await apiService.getVideos(selectedIndex.id)
           console.log(`Loaded ${videosResponse.videos.length} videos for index ${selectedIndex.name}`)
-          setVideos(videosResponse.videos)
+          // Limit to 6 videos maximum
+          const limitedVideos = videosResponse.videos.slice(0, 6)
+          setVideos(limitedVideos)
 
-          if (videosResponse.videos.length > 0) {
-            setSelectedVideo(videosResponse.videos[0])
+          if (limitedVideos.length > 0) {
+            setSelectedVideo(limitedVideos[0])
             // Select the video in the API
-            await apiService.selectVideo(selectedIndex.id, videosResponse.videos[0].id)
-            console.log(`Auto-selected first video: ${videosResponse.videos[0].name}`)
+            await apiService.selectVideo(selectedIndex.id, limitedVideos[0].id)
+            console.log(`Auto-selected first video: ${limitedVideos[0].name}`)
           } else {
             // Handle case where index has no videos
             setSelectedVideo(null)
@@ -1118,8 +1118,6 @@ export function ModelEvaluationPlatform() {
     const models = []
     if (availableModels["pegasus-1.2"])
       models.push({ value: "pegasus-1.2", label: "Pegasus 1.2", provider: "TwelveLabs" })
-    if (availableModels.nova)
-      models.push({ value: "nova", label: "AWS Nova", provider: "Amazon" })
     return models
   }
 
@@ -1318,7 +1316,7 @@ export function ModelEvaluationPlatform() {
           </Select>
         </div>
 
-        {/* Right Section with About, leaderboard, GitHub, and theme toggle */}
+        {/* Right Section with About, GitHub, and theme toggle */}
         <div className="flex items-center gap-2">
           {/* About Logo */}
           <Dialog open={isAboutModalOpen} onOpenChange={setIsAboutModalOpen}>
@@ -1427,17 +1425,6 @@ export function ModelEvaluationPlatform() {
             </DialogContent>
           </Dialog>
 
-          {/* Leaderboard Logo */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground"
-            onClick={() =>
-              showAlert("Leaderboard feature coming soon! Stay tuned for model performance rankings.", "info")
-            }
-          >
-            <Trophy className="w-4 h-4" />
-          </Button>
 
           {/* GitHub Logo */}
           <Button
@@ -1732,7 +1719,7 @@ export function ModelEvaluationPlatform() {
         {/* Right Panel - Models */}
         <div className="flex-1 flex flex-col bg-card/30 right-panel">
           <div className="border-b border-border px-6 py-4 flex items-center justify-between bg-card/50">
-            <h2 className="text-lg font-medium text-green-600 dark:text-green-400">Models</h2>
+            <h2 className="text-lg font-medium text-green-600 dark:text-green-400">TwelveLabs</h2>
             <Select value={rightModel} onValueChange={setRightModel}>
               <SelectTrigger className="w-56 bg-card border-border hover:bg-accent hover:text-accent-foreground shadow-sm">
                 <SelectValue />

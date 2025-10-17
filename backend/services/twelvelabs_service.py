@@ -57,7 +57,7 @@ class TwelveLabsService:
         if not self.api_key:
             return []
             
-        url = f"https://api.twelvelabs.io/v1.3/indexes/{index_id}/videos?page=1&page_limit=10&sort_by=created_at&sort_option=desc"
+        url = f"https://api.twelvelabs.io/v1.3/indexes/{index_id}/videos?page=1&page_limit=6&sort_by=created_at&sort_option=desc"
         headers = {
             "accept": "application/json",
             "x-api-key": self.api_key,
