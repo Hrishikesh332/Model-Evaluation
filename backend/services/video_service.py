@@ -59,9 +59,11 @@ class VideoService:
             print(f"Extracting frames directly from URL for video {video_id}")
             
             # Start frame extraction in background thread with retry mechanism
+            from config import Config
+            frame_count = Config.MAX_FRAMES_PER_VIDEO if Config.DEPLOYMENT_MODE == "production" else 10
             extraction_thread = threading.Thread(
                 target=self._extract_frames_with_retry,
-                args=(video_url, 10, cache_key, video_id),
+                args=(video_url, frame_count, cache_key, video_id),
                 daemon=True
             )
             extraction_thread.start()
@@ -108,16 +110,16 @@ class VideoService:
     
     def _extract_frames_with_retry(self, video_url, num_frames, cache_key, video_id, max_retries=3):
         """
-        Extract frames with retry mechanism for better reliability
+        Extract frames with retry mechanism and fallback strategies for deployment reliability
         """
         from config import Config
         
         for attempt in range(max_retries):
             try:
-                print(f"Frame extraction attempt {attempt + 1}/{max_retries} for video {video_id}")
+                print(f"🔄 Frame extraction attempt {attempt + 1}/{max_retries} for video {video_id}")
                 start_time = time.time()
                 
-                # Try to extract frames from URL
+                # Try optimized URL-based extraction first
                 frames = self.cache_manager.extract_frames_from_url(video_url, num_frames, cache_key)
                 
                 if frames and len(frames) > 0:
@@ -127,12 +129,21 @@ class VideoService:
                 else:
                     print(f"⚠️ Frame extraction returned no frames for video {video_id} (attempt {attempt + 1})")
                     
+                    # Try fallback: reduce number of frames for faster extraction
+                    if attempt == 1:
+                        print(f"🔄 Trying fallback: extracting fewer frames (5 instead of {num_frames})")
+                        frames = self.cache_manager.extract_frames_from_url(video_url, 5, cache_key)
+                        if frames and len(frames) > 0:
+                            extraction_time = time.time() - start_time
+                            print(f"✅ Fallback extraction successful for video {video_id} in {extraction_time:.2f}s ({len(frames)} frames)")
+                            return frames
+                    
             except Exception as e:
                 print(f"❌ Frame extraction failed for video {video_id} (attempt {attempt + 1}): {str(e)}")
                 
             if attempt < max_retries - 1:
-                wait_time = (attempt + 1) * 5  # Exponential backoff: 5s, 10s, 15s
-                print(f"Retrying frame extraction for video {video_id} in {wait_time}s...")
+                wait_time = (attempt + 1) * 3  # Reduced backoff: 3s, 6s, 9s
+                print(f"⏳ Retrying frame extraction for video {video_id} in {wait_time}s...")
                 time.sleep(wait_time)
         
         print(f"❌ Frame extraction failed for video {video_id} after {max_retries} attempts")

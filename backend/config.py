@@ -46,9 +46,15 @@ class Config:
     ]
     
     # Timeout configurations
-    FRAME_EXTRACTION_TIMEOUT = int(os.getenv("FRAME_EXTRACTION_TIMEOUT", "300"))  # 2 minutes default
+    FRAME_EXTRACTION_TIMEOUT = int(os.getenv("FRAME_EXTRACTION_TIMEOUT", "300"))  # 5 minutes default
     MODEL_EXECUTION_TIMEOUT = int(os.getenv("MODEL_EXECUTION_TIMEOUT", "300"))   # 5 minutes default
     REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "600"))                   # 10 minutes default
+    
+    # Deployment optimizations
+    DEPLOYMENT_MODE = os.getenv("DEPLOYMENT_MODE", "production")  # development, production
+    FRAME_QUALITY = int(os.getenv("FRAME_QUALITY", "75"))         # JPEG quality (1-100)
+    FRAME_DIMENSIONS = os.getenv("FRAME_DIMENSIONS", "480x270")   # Width x Height
+    MAX_FRAMES_PER_VIDEO = int(os.getenv("MAX_FRAMES_PER_VIDEO", "8"))  # Reduced for deployment
     
     @staticmethod
     def create_directories():
