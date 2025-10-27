@@ -23,10 +23,12 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Play,
 } from "lucide-react"
 import { apiService, type Index, type Video, type ModelStatus } from "@/lib/api"
 import { useTheme } from "next-themes"
 import { useApiState } from "@/hooks/use-api-state"
+import { VideoPlayer } from "@/components/video-player"
 
 interface ModelResponse {
   id: string
@@ -350,6 +352,8 @@ export function ModelEvaluationPlatform() {
   const [performanceData, setPerformanceData] = useState<any>(null)
   const [leftStreamingStarted, setLeftStreamingStarted] = useState(false)
   const [rightStreamingStarted, setRightStreamingStarted] = useState(false)
+  const [isVideoPlayerOpen, setIsVideoPlayerOpen] = useState(false)
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>("")
   
   // Use the custom hook for API state management
   const {
@@ -441,8 +445,21 @@ export function ModelEvaluationPlatform() {
           if (limitedVideos.length > 0) {
             setSelectedVideo(limitedVideos[0])
             // Select the video in the API
-            await apiService.selectVideo(selectedIndex.id, limitedVideos[0].id, leftModel)
-            console.log(`Auto-selected first video: ${limitedVideos[0].name}`)
+            try {
+              const response = await apiService.selectVideo(selectedIndex.id, limitedVideos[0].id, leftModel)
+              console.log(`Auto-selected first video: ${limitedVideos[0].name}`)
+              console.log("Auto-selection response:", response)
+              
+              // Store the video URL for the player
+              if (response && response.video_url) {
+                setCurrentVideoUrl(response.video_url)
+                console.log("Video URL stored from auto-selection:", response.video_url)
+              } else {
+                console.log("No video_url found in auto-selection response:", response)
+              }
+            } catch (error) {
+              console.error("Failed to auto-select video:", error)
+            }
           } else {
             // Handle case where index has no videos
             setSelectedVideo(null)
@@ -703,7 +720,17 @@ export function ModelEvaluationPlatform() {
       setVideoProcessingStatus("Processing video frames...")
 
       try {
-        await apiService.selectVideo(selectedIndex.id, video.id, leftModel)
+        const response = await apiService.selectVideo(selectedIndex.id, video.id, leftModel)
+        console.log("Video selection response:", response)
+        
+        // Store the video URL for the player
+        if (response && response.video_url) {
+          setCurrentVideoUrl(response.video_url)
+          console.log("Video URL stored:", response.video_url)
+        } else {
+          console.log("No video_url found in response:", response)
+        }
+        
         setTimeout(() => {
           setIsVideoProcessing(false)
           setVideoProcessingStatus("Video ready for analysis")
@@ -1309,6 +1336,21 @@ export function ModelEvaluationPlatform() {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Video Player Button */}
+          {selectedVideo && currentVideoUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsVideoPlayerOpen(true)}
+              className="ml-2 hover:bg-accent hover:text-accent-foreground"
+              title="View Video"
+            >
+              <Play className="w-4 h-4 mr-1" />
+              View Video
+            </Button>
+          )}
+          
         </div>
 
         {/* Right Section with About, GitHub, and theme toggle */}
@@ -1867,6 +1909,14 @@ export function ModelEvaluationPlatform() {
           </div>
         </div>
       </div>
+
+      {/* Video Player Modal */}
+      <VideoPlayer
+        isOpen={isVideoPlayerOpen}
+        onClose={() => setIsVideoPlayerOpen(false)}
+        videoUrl={currentVideoUrl}
+        videoTitle={selectedVideo?.name}
+      />
     </div>
   )
 }
