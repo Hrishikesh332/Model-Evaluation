@@ -33,7 +33,7 @@ For support or to join the conversation, visit our [Discord](https://discord.com
 
 ## Core Architectural Working
 
-![Core Architectural Working](https://github.com/Hrishikesh332/Model-Evaluation/blob/main/src/flow-model-eval.png)
+![Core Architectural Working](https://github.com/Hrishikesh332/Model-Evaluation/blob/main/backend/src/flow-model-eval.png)
 
 ## Project Structure
 
