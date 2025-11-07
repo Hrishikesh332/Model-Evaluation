@@ -264,7 +264,7 @@ In **`app.py`**, register your model by:
 Update **`routes/api_routes.py`** to include your model in the routing logic
 (Add it to the `model_dict` here as well)
 
-✅ Backend setup is complete — only minimal frontend adjustments are required next.
+Backend setup is complete — only minimal frontend adjustments are required next.
 
 ---
 
